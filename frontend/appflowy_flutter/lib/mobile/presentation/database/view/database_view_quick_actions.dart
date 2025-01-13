@@ -1,6 +1,6 @@
 import 'package:appflowy/generated/flowy_svgs.g.dart';
 import 'package:appflowy/generated/locale_keys.g.dart';
-import 'package:appflowy/mobile/presentation/bottom_sheet/bottom_sheet.dart';
+import 'package:appflowy/mobile/presentation/bottom_sheet/show_transition_bottom_sheet.dart';
 import 'package:appflowy/mobile/presentation/widgets/flowy_mobile_quick_action_button.dart';
 import 'package:appflowy/plugins/database/application/database_controller.dart';
 import 'package:appflowy/workspace/application/view/view_bloc.dart';
@@ -30,18 +30,13 @@ class MobileDatabaseViewQuickActions extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        _actionButton(context, _Action.edit, () {
+        _actionButton(context, _Action.edit, () async {
           final bloc = context.read<ViewBloc>();
-          context.pop();
-          showMobileBottomSheet(
+          await showTransitionMobileBottomSheet(
             context,
             showHeader: true,
             showDoneButton: true,
             title: LocaleKeys.grid_settings_editView.tr(),
-            enableDraggableScrollable: true,
-            initialChildSize: 0.98,
-            minChildSize: 0.98,
-            maxChildSize: 0.98,
             builder: (_) => BlocProvider.value(
               value: bloc,
               child: MobileEditDatabaseViewScreen(
@@ -49,20 +44,30 @@ class MobileDatabaseViewQuickActions extends StatelessWidget {
               ),
             ),
           );
+          if (context.mounted) {
+            context.pop();
+          }
         }),
-        if (!isInline) ...[
-          _divider(),
-          _actionButton(context, _Action.duplicate, () {
+        const MobileQuickActionDivider(),
+        _actionButton(
+          context,
+          _Action.duplicate,
+          () {
             context.read<ViewBloc>().add(const ViewEvent.duplicate());
             context.pop();
-          }),
-          _divider(),
-          _actionButton(context, _Action.delete, () {
+          },
+          !isInline,
+        ),
+        const MobileQuickActionDivider(),
+        _actionButton(
+          context,
+          _Action.delete,
+          () {
             context.read<ViewBloc>().add(const ViewEvent.delete());
             context.pop();
-          }),
-          _divider(),
-        ],
+          },
+          !isInline,
+        ),
       ],
     );
   }
@@ -70,20 +75,18 @@ class MobileDatabaseViewQuickActions extends StatelessWidget {
   Widget _actionButton(
     BuildContext context,
     _Action action,
-    VoidCallback onTap,
-  ) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8.0),
-      child: MobileQuickActionButton(
-        icon: action.icon,
-        text: action.label,
-        color: action.color(context),
-        onTap: onTap,
-      ),
+    VoidCallback onTap, [
+    bool enable = true,
+  ]) {
+    return MobileQuickActionButton(
+      icon: action.icon,
+      text: action.label,
+      textColor: action.color(context),
+      iconColor: action.color(context),
+      onTap: onTap,
+      enable: enable,
     );
   }
-
-  Widget _divider() => const Divider(height: 9);
 }
 
 enum _Action {
@@ -101,9 +104,9 @@ enum _Action {
 
   FlowySvgData get icon {
     return switch (this) {
-      edit => FlowySvgs.edit_s,
-      duplicate => FlowySvgs.copy_s,
-      delete => FlowySvgs.delete_s,
+      edit => FlowySvgs.view_item_rename_s,
+      duplicate => FlowySvgs.duplicate_s,
+      delete => FlowySvgs.trash_s,
     };
   }
 

@@ -1,21 +1,18 @@
 import 'package:appflowy/generated/flowy_svgs.g.dart';
 import 'package:appflowy/generated/locale_keys.g.dart';
+import 'package:appflowy/plugins/database/application/cell/bloc/text_cell_bloc.dart';
 import 'package:appflowy/plugins/database/application/cell/cell_controller.dart';
 import 'package:appflowy/plugins/database/application/database_controller.dart';
 import 'package:appflowy/plugins/database/application/field/field_controller.dart';
 import 'package:appflowy/plugins/database/application/row/row_controller.dart';
-import 'package:appflowy/plugins/database/application/row/row_service.dart';
+import 'package:appflowy/plugins/database/calendar/application/calendar_bloc.dart';
 import 'package:appflowy/plugins/database/calendar/application/calendar_event_editor_bloc.dart';
+import 'package:appflowy/plugins/database/grid/presentation/widgets/header/desktop_field_cell.dart';
+import 'package:appflowy/plugins/database/widgets/cell/editable_cell_builder.dart';
 import 'package:appflowy/plugins/database/widgets/cell/editable_cell_skeleton/text.dart';
 import 'package:appflowy/plugins/database/widgets/row/accessory/cell_accessory.dart';
-import 'package:appflowy/plugins/database/widgets/cell/editable_cell_builder.dart';
 import 'package:appflowy/plugins/database/widgets/row/cells/cell_container.dart';
-import 'package:appflowy/plugins/database/application/cell/bloc/text_cell_bloc.dart';
-import 'package:appflowy/plugins/database/widgets/row/row_detail.dart';
-import 'package:appflowy/util/field_type_extension.dart';
-import 'package:appflowy_backend/log.dart';
 import 'package:appflowy_backend/protobuf/flowy-database2/protobuf.dart';
-import 'package:appflowy_popover/appflowy_popover.dart';
 import 'package:collection/collection.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flowy_infra_ui/flowy_infra_ui.dart';
@@ -28,6 +25,7 @@ class CalendarEventEditor extends StatelessWidget {
     required RowMetaPB rowMeta,
     required this.layoutSettings,
     required this.databaseController,
+    required this.onExpand,
   })  : rowController = RowController(
           rowMeta: rowMeta,
           viewId: databaseController.viewId,
@@ -40,6 +38,7 @@ class CalendarEventEditor extends StatelessWidget {
   final DatabaseController databaseController;
   final RowController rowController;
   final EditableCellBuilder cellBuilder;
+  final VoidCallback onExpand;
 
   @override
   Widget build(BuildContext context) {
@@ -55,6 +54,7 @@ class CalendarEventEditor extends StatelessWidget {
           EventEditorControls(
             rowController: rowController,
             databaseController: databaseController,
+            onExpand: onExpand,
           ),
           Flexible(
             child: EventPropertyList(
@@ -74,10 +74,12 @@ class EventEditorControls extends StatelessWidget {
     super.key,
     required this.rowController,
     required this.databaseController,
+    required this.onExpand,
   });
 
   final RowController rowController;
   final DatabaseController databaseController;
+  final VoidCallback onExpand;
 
   @override
   Widget build(BuildContext context) {
@@ -86,17 +88,34 @@ class EventEditorControls extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
+          FlowyTooltip(
+            message: LocaleKeys.calendar_duplicateEvent.tr(),
+            child: FlowyIconButton(
+              width: 20,
+              icon: const FlowySvg(
+                FlowySvgs.m_duplicate_s,
+                size: Size.square(17),
+              ),
+              iconColorOnHover: Theme.of(context).colorScheme.onSecondary,
+              onPressed: () => context.read<CalendarBloc>().add(
+                    CalendarEvent.duplicateEvent(
+                      rowController.viewId,
+                      rowController.rowId,
+                    ),
+                  ),
+            ),
+          ),
+          const HSpace(8.0),
           FlowyIconButton(
             width: 20,
             icon: const FlowySvg(FlowySvgs.delete_s),
             iconColorOnHover: Theme.of(context).colorScheme.onSecondary,
-            onPressed: () async {
-              final result = await RowBackendService.deleteRow(
-                rowController.viewId,
-                rowController.rowId,
-              );
-              result.fold((l) => null, (err) => Log.error(err));
-            },
+            onPressed: () => context.read<CalendarBloc>().add(
+                  CalendarEvent.deleteEvent(
+                    rowController.viewId,
+                    rowController.rowId,
+                  ),
+                ),
           ),
           const HSpace(8.0),
           FlowyIconButton(
@@ -105,15 +124,7 @@ class EventEditorControls extends StatelessWidget {
             iconColorOnHover: Theme.of(context).colorScheme.onSecondary,
             onPressed: () {
               PopoverContainer.of(context).close();
-              FlowyOverlay.show(
-                context: context,
-                builder: (BuildContext context) {
-                  return RowDetailPage(
-                    databaseController: databaseController,
-                    rowController: rowController,
-                  );
-                },
-              );
+              onExpand.call();
             },
           ),
         ],
@@ -228,10 +239,9 @@ class _PropertyCellState extends State<PropertyCell> {
               padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 6),
               child: Row(
                 children: [
-                  FlowySvg(
-                    fieldInfo.fieldType.svgData,
-                    color: Theme.of(context).hintColor,
-                    size: const Size.square(14),
+                  FieldIcon(
+                    fieldInfo: fieldInfo,
+                    dimension: 14,
                   ),
                   const HSpace(4.0),
                   Expanded(
@@ -268,7 +278,9 @@ class _TitleTextCellSkin extends IEditableTextCellSkin {
       textStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 14),
       focusNode: focusNode,
       hintText: LocaleKeys.calendar_defaultNewCalendarTitle.tr(),
-      onChanged: (text) => bloc.add(TextCellEvent.updateText(text)),
+      onEditingComplete: () {
+        bloc.add(TextCellEvent.updateText(textEditingController.text));
+      },
     );
   }
 }

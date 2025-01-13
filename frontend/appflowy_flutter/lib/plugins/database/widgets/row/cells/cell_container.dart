@@ -1,12 +1,14 @@
+import 'package:flowy_infra/theme_extension.dart';
 import 'package:flutter/material.dart';
+
 import 'package:provider/provider.dart';
 import 'package:styled_widget/styled_widget.dart';
 
 import '../../../grid/presentation/layout/sizes.dart';
 import '../../../grid/presentation/widgets/row/row.dart';
+import '../../cell/editable_cell_builder.dart';
 import '../accessory/cell_accessory.dart';
 import '../accessory/cell_shortcuts.dart';
-import '../../cell/editable_cell_builder.dart';
 
 class CellContainer extends StatelessWidget {
   const CellContainer({
@@ -56,7 +58,7 @@ class CellContainer extends StatelessWidget {
               }
             },
             child: Container(
-              constraints: BoxConstraints(maxWidth: width, minHeight: 46),
+              constraints: BoxConstraints(maxWidth: width, minHeight: 36),
               decoration: _makeBoxDecoration(context, isFocus),
               child: container,
             ),
@@ -75,7 +77,8 @@ class CellContainer extends StatelessWidget {
       return BoxDecoration(border: Border.fromBorderSide(borderSide));
     }
 
-    final borderSide = BorderSide(color: Theme.of(context).dividerColor);
+    final borderSide =
+        BorderSide(color: AFThemeExtension.of(context).borderColor);
     return BoxDecoration(
       border: Border(right: borderSide, bottom: borderSide),
     );
@@ -98,7 +101,7 @@ class _GridCellEnterRegion extends StatelessWidget {
     return Selector2<RegionStateNotifier, CellContainerNotifier, bool>(
       selector: (context, regionNotifier, cellNotifier) =>
           !cellNotifier.isFocus &&
-          (cellNotifier.onEnter || regionNotifier.onEnter && isPrimary),
+          (cellNotifier.isHover || regionNotifier.onEnter && isPrimary),
       builder: (context, showAccessory, _) {
         final List<Widget> children = [child];
 
@@ -113,11 +116,11 @@ class _GridCellEnterRegion extends StatelessWidget {
         return MouseRegion(
           cursor: SystemMouseCursors.click,
           onEnter: (p) =>
-              CellContainerNotifier.of(context, listen: false).onEnter = true,
+              CellContainerNotifier.of(context, listen: false).isHover = true,
           onExit: (p) =>
-              CellContainerNotifier.of(context, listen: false).onEnter = false,
+              CellContainerNotifier.of(context, listen: false).isHover = false,
           child: Stack(
-            alignment: AlignmentDirectional.center,
+            alignment: Alignment.center,
             fit: StackFit.expand,
             children: children,
           ),
@@ -138,7 +141,7 @@ class CellContainerNotifier extends ChangeNotifier {
     }
   }
 
-  set onEnter(bool value) {
+  set isHover(bool value) {
     if (_onEnter != value) {
       _onEnter = value;
       notifyListeners();
@@ -147,7 +150,7 @@ class CellContainerNotifier extends ChangeNotifier {
 
   bool get isFocus => _isFocus;
 
-  bool get onEnter => _onEnter;
+  bool get isHover => _onEnter;
 
   static CellContainerNotifier of(BuildContext context, {bool listen = true}) {
     return Provider.of<CellContainerNotifier>(context, listen: listen);

@@ -1,5 +1,3 @@
-import 'package:flutter/material.dart';
-
 import 'package:appflowy/generated/flowy_svgs.g.dart';
 import 'package:appflowy/generated/locale_keys.g.dart';
 import 'package:appflowy/mobile/presentation/database/card/card_detail/mobile_card_detail_screen.dart';
@@ -7,10 +5,10 @@ import 'package:appflowy/plugins/database/application/database_controller.dart';
 import 'package:appflowy/plugins/database/application/field/field_info.dart';
 import 'package:appflowy/plugins/database/application/row/row_service.dart';
 import 'package:appflowy/plugins/database/grid/application/grid_bloc.dart';
-import 'package:appflowy/plugins/database/grid/presentation/widgets/shortcuts.dart';
 import 'package:appflowy/plugins/database/tab_bar/tab_bar_view.dart';
+import 'package:appflowy/shared/flowy_error_page.dart';
 import 'package:appflowy/startup/startup.dart';
-import 'package:appflowy/workspace/application/notifications/notification_action_bloc.dart';
+import 'package:appflowy/workspace/application/action_navigation/action_navigation_bloc.dart';
 import 'package:appflowy_backend/log.dart';
 import 'package:appflowy_backend/protobuf/flowy-database2/protobuf.dart';
 import 'package:appflowy_backend/protobuf/flowy-folder/protobuf.dart';
@@ -18,7 +16,7 @@ import 'package:collection/collection.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flowy_infra/theme_extension.dart';
 import 'package:flowy_infra_ui/flowy_infra_ui.dart';
-import 'package:flowy_infra_ui/widget/error_page.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:linked_scroll_controller/linked_scroll_controller.dart';
@@ -29,7 +27,7 @@ import 'widgets/header/mobile_grid_header.dart';
 import 'widgets/mobile_fab.dart';
 import 'widgets/row/mobile_row.dart';
 
-class MobileGridTabBarBuilderImpl implements DatabaseTabBarItemBuilder {
+class MobileGridTabBarBuilderImpl extends DatabaseTabBarItemBuilder {
   @override
   Widget content(
     BuildContext context,
@@ -43,6 +41,7 @@ class MobileGridTabBarBuilderImpl implements DatabaseTabBarItemBuilder {
       view: view,
       databaseController: controller,
       initialRowId: initialRowId,
+      shrinkWrap: shrinkWrap,
     );
   }
 
@@ -69,12 +68,14 @@ class MobileGridPage extends StatefulWidget {
     required this.databaseController,
     this.onDeleted,
     this.initialRowId,
+    this.shrinkWrap = false,
   });
 
   final ViewPB view;
   final DatabaseController databaseController;
   final VoidCallback? onDeleted;
   final String? initialRowId;
+  final bool shrinkWrap;
 
   @override
   State<MobileGridPage> createState() => _MobileGridPageState();
@@ -87,8 +88,8 @@ class _MobileGridPageState extends State<MobileGridPage> {
   Widget build(BuildContext context) {
     return MultiBlocProvider(
       providers: [
-        BlocProvider<NotificationActionBloc>.value(
-          value: getIt<NotificationActionBloc>(),
+        BlocProvider<ActionNavigationBloc>.value(
+          value: getIt<ActionNavigationBloc>(),
         ),
         BlocProvider<GridBloc>(
           create: (context) => GridBloc(
@@ -105,10 +106,14 @@ class _MobileGridPageState extends State<MobileGridPage> {
             finish: (result) {
               _openRow(context, widget.initialRowId, true);
               return result.successOrFail.fold(
-                (_) => GridShortcuts(child: GridPageContent(view: widget.view)),
-                (err) => FlowyErrorPage.message(
-                  err.toString(),
-                  howToFix: LocaleKeys.errorDialog_howToFixFallback.tr(),
+                (_) => GridPageContent(
+                  view: widget.view,
+                  shrinkWrap: widget.shrinkWrap,
+                ),
+                (err) => Center(
+                  child: AppFlowyErrorPage(
+                    error: err,
+                  ),
                 ),
               );
             },
@@ -145,9 +150,11 @@ class GridPageContent extends StatefulWidget {
   const GridPageContent({
     super.key,
     required this.view,
+    this.shrinkWrap = false,
   });
 
   final ViewPB view;
+  final bool shrinkWrap;
 
   @override
   State<GridPageContent> createState() => _GridPageContentState();
@@ -157,12 +164,14 @@ class _GridPageContentState extends State<GridPageContent> {
   final _scrollController = GridScrollController(
     scrollGroupController: LinkedScrollControllerGroup(),
   );
-  late final ScrollController headerScrollController;
+  late final ScrollController contentScrollController;
+  late final ScrollController reorderableController;
 
   @override
   void initState() {
     super.initState();
-    headerScrollController = _scrollController.linkHorizontalController();
+    contentScrollController = _scrollController.linkHorizontalController();
+    reorderableController = _scrollController.linkHorizontalController();
   }
 
   @override
@@ -194,9 +203,11 @@ class _GridPageContentState extends State<GridPageContent> {
         children: [
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
               _GridHeader(
-                headerScrollController: headerScrollController,
+                contentScrollController: contentScrollController,
+                reorderableController: reorderableController,
               ),
               _GridRows(
                 viewId: widget.view.id,
@@ -204,11 +215,12 @@ class _GridPageContentState extends State<GridPageContent> {
               ),
             ],
           ),
-          Positioned(
-            bottom: 20,
-            right: 20,
-            child: getGridFabs(context),
-          ),
+          if (!widget.shrinkWrap)
+            Positioned(
+              bottom: 16,
+              right: 16,
+              child: getGridFabs(context),
+            ),
         ],
       ),
     );
@@ -216,9 +228,13 @@ class _GridPageContentState extends State<GridPageContent> {
 }
 
 class _GridHeader extends StatelessWidget {
-  const _GridHeader({required this.headerScrollController});
+  const _GridHeader({
+    required this.contentScrollController,
+    required this.reorderableController,
+  });
 
-  final ScrollController headerScrollController;
+  final ScrollController contentScrollController;
+  final ScrollController reorderableController;
 
   @override
   Widget build(BuildContext context) {
@@ -226,7 +242,8 @@ class _GridHeader extends StatelessWidget {
       builder: (context, state) {
         return MobileGridHeader(
           viewId: state.viewId,
-          anchorScrollController: headerScrollController,
+          contentScrollController: contentScrollController,
+          reorderableController: reorderableController,
         );
       },
     );
@@ -247,8 +264,8 @@ class _GridRows extends StatelessWidget {
     return BlocBuilder<GridBloc, GridState>(
       buildWhen: (previous, current) => previous.fields != current.fields,
       builder: (context, state) {
-        final double contentWidth = _getContentWidth(state.fields);
-        return Expanded(
+        final double contentWidth = getMobileGridContentWidth(state.fields);
+        return Flexible(
           child: _WrapScrollView(
             scrollController: scrollController,
             contentWidth: contentWidth,
@@ -277,14 +294,6 @@ class _GridRows extends StatelessWidget {
     );
   }
 
-  double _getContentWidth(List<FieldInfo> fields) {
-    final visibleFields = fields.where(
-      (field) =>
-          field.fieldSettings?.visibility != FieldVisibility.AlwaysHidden,
-    );
-    return (visibleFields.length + 1) * 200 + GridSize.leadingHeaderPadding * 2;
-  }
-
   Widget _renderList(
     BuildContext context,
     GridState state,
@@ -305,6 +314,7 @@ class _GridRows extends StatelessWidget {
     return ReorderableListView.builder(
       scrollController: scrollController.verticalController,
       buildDefaultDragHandles: false,
+      shrinkWrap: true,
       proxyDecorator: (child, index, animation) => Material(
         color: Colors.transparent,
         child: child,
@@ -437,4 +447,12 @@ class _AddRowButton extends StatelessWidget {
       ),
     );
   }
+}
+
+double getMobileGridContentWidth(List<FieldInfo> fields) {
+  final visibleFields = fields.where(
+    (field) => field.visibility != FieldVisibility.AlwaysHidden,
+  );
+  return (visibleFields.length + 1) * 200 +
+      GridSize.horizontalHeaderPadding * 2;
 }

@@ -12,8 +12,7 @@
             "program": "./lib/main.dart",
             "type": "dart",
             "env": {
-                "RUST_LOG": "trace",
-                "RUST_BACKTRACE": "1"
+                "RUST_LOG": "debug",
             },
             // uncomment the following line to testing performance.
             // "flutterMode": "profile",
@@ -115,24 +114,12 @@
         },
         {
             "name": "AF-desktop: Debug Rust",
+            "type": "lldb",
             "request": "attach",
-            "type": "lldb",
             "pid": "${command:pickMyProcess}"
-        },
-        {
-            // https://tauri.app/v1/guides/debugging/vs-code
-            "type": "lldb",
-            "request": "launch",
-            "name": "AF-tauri: Debug backend",
-            "cargo": {
-                "args": [
-                    "build",
-                    "--manifest-path=./appflowy_tauri/src-tauri/Cargo.toml",
-                    "--no-default-features"
-                ]
-            },
-            "preLaunchTask": "AF: Tauri UI Dev",
-            "cwd": "${workspaceRoot}/appflowy_tauri/"
+            // To launch the application directly, use the following configuration:
+            // "request": "launch",
+            // "program": "[YOUR_APPLICATION_PATH]",
         },
     ]
 }

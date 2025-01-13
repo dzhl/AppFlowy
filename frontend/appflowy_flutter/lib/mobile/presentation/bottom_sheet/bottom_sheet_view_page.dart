@@ -1,21 +1,30 @@
 import 'package:appflowy/generated/flowy_svgs.g.dart';
 import 'package:appflowy/generated/locale_keys.g.dart';
+import 'package:appflowy/mobile/application/base/mobile_view_page_bloc.dart';
 import 'package:appflowy/mobile/presentation/bottom_sheet/bottom_sheet.dart';
-import 'package:appflowy/mobile/presentation/widgets/widgets.dart';
+import 'package:appflowy/mobile/presentation/widgets/flowy_mobile_quick_action_button.dart';
+import 'package:appflowy/plugins/shared/share/share_bloc.dart';
 import 'package:appflowy_backend/protobuf/flowy-folder/view.pb.dart';
+import 'package:appflowy_backend/protobuf/flowy-user/protobuf.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 enum MobileViewBottomSheetBodyAction {
   undo,
   redo,
-  share,
   rename,
   duplicate,
   delete,
   addToFavorites,
   removeFromFavorites,
-  helpCenter;
+  helpCenter,
+  publish,
+  unpublish,
+  copyPublishLink,
+  visitSite,
+  copyShareLink,
+  updatePathName,
 }
 
 typedef MobileViewBottomSheetBodyActionCallback = void Function(
@@ -87,57 +96,113 @@ class MobileViewBottomSheetBody extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        FlowyOptionTile.text(
+        MobileQuickActionButton(
           text: LocaleKeys.button_rename.tr(),
-          leftIcon: const FlowySvg(
-            FlowySvgs.m_rename_s,
-          ),
-          showTopBorder: false,
+          icon: FlowySvgs.view_item_rename_s,
+          iconSize: const Size.square(18),
           onTap: () => onAction(
             MobileViewBottomSheetBodyAction.rename,
           ),
         ),
-        FlowyOptionTile.text(
+        _divider(),
+        MobileQuickActionButton(
           text: isFavorite
               ? LocaleKeys.button_removeFromFavorites.tr()
               : LocaleKeys.button_addToFavorites.tr(),
-          leftIcon: FlowySvg(
-            size: const Size(20, 20),
-            isFavorite
-                ? FlowySvgs.m_favorite_selected_lg
-                : FlowySvgs.m_favorite_unselected_lg,
-            color: isFavorite ? Colors.yellow : null,
-          ),
-          showTopBorder: false,
+          icon: isFavorite ? FlowySvgs.unfavorite_s : FlowySvgs.favorite_s,
+          iconSize: const Size.square(18),
           onTap: () => onAction(
             isFavorite
                 ? MobileViewBottomSheetBodyAction.removeFromFavorites
                 : MobileViewBottomSheetBodyAction.addToFavorites,
           ),
         ),
-        FlowyOptionTile.text(
+        _divider(),
+        MobileQuickActionButton(
           text: LocaleKeys.button_duplicate.tr(),
-          leftIcon: const FlowySvg(
-            FlowySvgs.m_duplicate_s,
-          ),
-          showTopBorder: false,
+          icon: FlowySvgs.duplicate_s,
+          iconSize: const Size.square(18),
           onTap: () => onAction(
             MobileViewBottomSheetBodyAction.duplicate,
           ),
         ),
-        FlowyOptionTile.text(
+        // copy link
+        _divider(),
+        MobileQuickActionButton(
+          text: LocaleKeys.shareAction_copyLink.tr(),
+          icon: FlowySvgs.m_copy_link_s,
+          iconSize: const Size.square(18),
+          onTap: () => onAction(
+            MobileViewBottomSheetBodyAction.copyShareLink,
+          ),
+        ),
+        _divider(),
+        ..._buildPublishActions(context),
+        MobileQuickActionButton(
           text: LocaleKeys.button_delete.tr(),
           textColor: Theme.of(context).colorScheme.error,
-          leftIcon: FlowySvg(
-            FlowySvgs.m_delete_s,
-            color: Theme.of(context).colorScheme.error,
-          ),
-          showTopBorder: false,
+          icon: FlowySvgs.trash_s,
+          iconColor: Theme.of(context).colorScheme.error,
+          iconSize: const Size.square(18),
           onTap: () => onAction(
             MobileViewBottomSheetBodyAction.delete,
           ),
         ),
+        _divider(),
       ],
     );
   }
+
+  List<Widget> _buildPublishActions(BuildContext context) {
+    final userProfile = context.read<MobileViewPageBloc>().state.userProfilePB;
+    // the publish feature is only available for AppFlowy Cloud
+    if (userProfile == null ||
+        userProfile.authenticator != AuthenticatorPB.AppFlowyCloud) {
+      return [];
+    }
+
+    final isPublished = context.watch<ShareBloc>().state.isPublished;
+    if (isPublished) {
+      return [
+        MobileQuickActionButton(
+          text: LocaleKeys.shareAction_updatePathName.tr(),
+          icon: FlowySvgs.view_item_rename_s,
+          iconSize: const Size.square(18),
+          onTap: () => onAction(
+            MobileViewBottomSheetBodyAction.updatePathName,
+          ),
+        ),
+        _divider(),
+        MobileQuickActionButton(
+          text: LocaleKeys.shareAction_visitSite.tr(),
+          icon: FlowySvgs.m_visit_site_s,
+          iconSize: const Size.square(18),
+          onTap: () => onAction(
+            MobileViewBottomSheetBodyAction.visitSite,
+          ),
+        ),
+        _divider(),
+        MobileQuickActionButton(
+          text: LocaleKeys.shareAction_unPublish.tr(),
+          icon: FlowySvgs.m_unpublish_s,
+          iconSize: const Size.square(18),
+          onTap: () => onAction(
+            MobileViewBottomSheetBodyAction.unpublish,
+          ),
+        ),
+      ];
+    } else {
+      return [
+        MobileQuickActionButton(
+          text: LocaleKeys.shareAction_publish.tr(),
+          icon: FlowySvgs.m_publish_s,
+          onTap: () => onAction(
+            MobileViewBottomSheetBodyAction.publish,
+          ),
+        ),
+      ];
+    }
+  }
+
+  Widget _divider() => const MobileQuickActionDivider();
 }

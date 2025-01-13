@@ -38,11 +38,7 @@ class DatabaseShareButton extends StatelessWidget {
           );
         },
         child: BlocBuilder<DatabaseShareBloc, DatabaseShareState>(
-          builder: (context, state) => ConstrainedBox(
-            constraints: const BoxConstraints.expand(
-              height: 30,
-              width: 100,
-            ),
+          builder: (context, state) => IntrinsicWidth(
             child: DatabaseShareActionList(view: view),
           ),
         ),
@@ -101,13 +97,16 @@ class DatabaseShareActionListState extends State<DatabaseShareActionList> {
       actions: ShareAction.values
           .map((action) => ShareActionWrapper(action))
           .toList(),
-      buildChild: (controller) {
-        return RoundedTextButton(
+      buildChild: (controller) => Listener(
+        onPointerDown: (_) => controller.show(),
+        child: RoundedTextButton(
           title: LocaleKeys.shareAction_buttonText.tr(),
+          padding: const EdgeInsets.symmetric(horizontal: 12.0),
+          fontSize: 14.0,
           textColor: Theme.of(context).colorScheme.onPrimary,
-          onPressed: () => controller.show(),
-        );
-      },
+          onPressed: () {},
+        ),
+      ),
       onSelected: (action, controller) async {
         switch (action.inner) {
           case ShareAction.csv:

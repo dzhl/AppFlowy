@@ -1,14 +1,18 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
-
 import 'package:appflowy/generated/locale_keys.g.dart';
-import 'package:appflowy/plugins/base/emoji/emoji_text.dart';
 import 'package:appflowy/plugins/document/presentation/editor_plugins/base/insert_page_command.dart';
+import 'package:appflowy/plugins/document/presentation/editor_plugins/header/emoji_icon_widget.dart';
 import 'package:appflowy/plugins/document/presentation/editor_plugins/mention/mention_block.dart';
 import 'package:appflowy/plugins/document/presentation/editor_plugins/mention/mention_page_block.dart';
 import 'package:appflowy/plugins/inline_actions/inline_actions_menu.dart';
 import 'package:appflowy/plugins/inline_actions/inline_actions_result.dart';
+import 'package:appflowy/plugins/inline_actions/service_handler.dart';
+import 'package:appflowy/shared/flowy_error_page.dart';
+import 'package:appflowy/shared/icon_emoji_picker/flowy_icon_emoji_picker.dart';
+import 'package:appflowy/shared/list_extension.dart';
+import 'package:appflowy/startup/startup.dart';
+import 'package:appflowy/workspace/application/recent/cached_recent_service.dart';
 import 'package:appflowy/workspace/application/view/view_ext.dart';
 import 'package:appflowy/workspace/application/view/view_service.dart';
 import 'package:appflowy_backend/protobuf/flowy-error/errors.pb.dart';
@@ -16,16 +20,19 @@ import 'package:appflowy_backend/protobuf/flowy-folder/view.pb.dart';
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flowy_infra_ui/widget/dialog/styled_dialogs.dart';
-import 'package:flowy_infra_ui/widget/error_page.dart';
+import 'package:flutter/material.dart';
 
-class InlinePageReferenceService {
+// const _channel = "InlinePageReference";
+
+// TODO(Mathias): Clean up and use folder search instead
+class InlinePageReferenceService extends InlineActionsDelegate {
   InlinePageReferenceService({
     required this.currentViewId,
     this.viewLayout,
     this.customTitle,
     this.insertPage = false,
-    this.limitResults = 0,
-  }) {
+    this.limitResults = 5,
+  }) : assert(limitResults > 0, 'limitResults must be greater than 0') {
     init();
   }
 
@@ -41,103 +48,109 @@ class InlinePageReferenceService {
   ///
   final bool insertPage;
 
-  /// Defaults to 0 where there are no limits
-  /// Anything above 0 will limit the page reference results
+  /// Defaults to 5
+  /// Will limit the page reference results
   /// to [limitResults].
   ///
   final int limitResults;
 
-  final ViewBackendService service = ViewBackendService();
-  List<InlineActionsMenuItem> _items = [];
-  List<InlineActionsMenuItem> _filtered = [];
+  late final CachedRecentService _recentService;
+
+  bool _recentViewsInitialized = false;
+  late final List<InlineActionsMenuItem> _recentViews;
+
+  Future<List<InlineActionsMenuItem>> _getRecentViews() async {
+    if (_recentViewsInitialized) {
+      return _recentViews;
+    }
+
+    _recentViewsInitialized = true;
+
+    final sectionViews = await _recentService.recentViews();
+    final views =
+        sectionViews.unique((e) => e.item.id).map((e) => e.item).toList();
+
+    // Filter by viewLayout
+    views.retainWhere(
+      (i) =>
+          currentViewId != i.id &&
+          (viewLayout == null || i.layout == viewLayout),
+    );
+
+    // Map to InlineActionsMenuItem, then take 5 items
+    return _recentViews = views.map(_fromView).take(5).toList();
+  }
+
+  bool _viewsInitialized = false;
+  late final List<ViewPB> _allViews;
+
+  Future<List<ViewPB>> _getViews() async {
+    if (_viewsInitialized) {
+      return _allViews;
+    }
+
+    _viewsInitialized = true;
+
+    final viewResult = await ViewBackendService.getAllViews();
+    return _allViews = viewResult
+            .toNullable()
+            ?.items
+            .where((v) => viewLayout == null || v.layout == viewLayout)
+            .toList() ??
+        const [];
+  }
 
   Future<void> init() async {
-    _items = await _generatePageItems(currentViewId, viewLayout);
-    _filtered = limitResults > 0 ? _items.take(limitResults).toList() : _items;
-    _initCompleter.complete();
+    _recentService = getIt<CachedRecentService>();
+    // _searchListener.start(onResultsClosed: _onResults);
   }
 
-  Future<List<InlineActionsMenuItem>> _filterItems(String? search) async {
-    await _initCompleter.future;
+  @override
+  Future<void> dispose() async {
+    if (!_initCompleter.isCompleted) {
+      _initCompleter.complete();
+    }
 
-    final items = (search == null || search.isEmpty)
-        ? _items
-        : _items.where(
-            (item) =>
-                item.keywords != null &&
-                item.keywords!.isNotEmpty &&
-                item.keywords!.any(
-                  (keyword) => keyword.contains(search.toLowerCase()),
-                ),
-          );
-
-    return limitResults > 0
-        ? items.take(limitResults).toList()
-        : items.toList();
+    await super.dispose();
   }
 
-  Future<InlineActionsResult> inlinePageReferenceDelegate([
+  @override
+  Future<InlineActionsResult> search([
     String? search,
   ]) async {
-    _filtered = await _filterItems(search);
+    final isSearching = search != null && search.isNotEmpty;
+
+    late List<InlineActionsMenuItem> items;
+    if (isSearching) {
+      final allViews = await _getViews();
+
+      items = allViews
+          .where(
+            (view) =>
+                view.id != currentViewId &&
+                    view.name.toLowerCase().contains(search.toLowerCase()) ||
+                (view.name.isEmpty && search.isEmpty) ||
+                (view.name.isEmpty &&
+                    LocaleKeys.menuAppHeader_defaultNewPageName
+                        .tr()
+                        .toLowerCase()
+                        .contains(search.toLowerCase())),
+          )
+          .take(limitResults)
+          .map((view) => _fromView(view))
+          .toList();
+    } else {
+      items = await _getRecentViews();
+    }
 
     return InlineActionsResult(
       title: customTitle?.isNotEmpty == true
           ? customTitle!
-          : LocaleKeys.inlineActions_pageReference.tr(),
-      results: _filtered,
+          : isSearching
+              ? LocaleKeys.inlineActions_pageReference.tr()
+              : LocaleKeys.inlineActions_recentPages.tr(),
+      results: items,
     );
-  }
-
-  Future<List<InlineActionsMenuItem>> _generatePageItems(
-    String currentViewId,
-    ViewLayoutPB? viewLayout,
-  ) async {
-    late List<ViewPB> views;
-    if (viewLayout != null) {
-      views = await service.fetchViewsWithLayoutType(viewLayout);
-    } else {
-      views = await service.fetchViews();
-    }
-
-    if (views.isEmpty) {
-      return [];
-    }
-
-    final List<InlineActionsMenuItem> pages = [];
-    views.sort((a, b) => b.createTime.compareTo(a.createTime));
-
-    for (final view in views) {
-      if (view.id == currentViewId) {
-        continue;
-      }
-
-      final pageSelectionMenuItem = InlineActionsMenuItem(
-        keywords: [view.name.toLowerCase()],
-        label: view.name,
-        icon: (onSelected) => view.icon.value.isNotEmpty
-            ? EmojiText(
-                emoji: view.icon.value,
-                fontSize: 12,
-                textAlign: TextAlign.center,
-                lineHeight: 1.3,
-              )
-            : view.defaultIcon(),
-        onSelected: (context, editorState, menuService, replace) => insertPage
-            ? _onInsertPageRef(view, context, editorState, replace)
-            : _onInsertLinkRef(
-                view,
-                context,
-                editorState,
-                menuService,
-                replace,
-              ),
-      );
-
-      pages.add(pageSelectionMenuItem);
-    }
-
-    return pages;
   }
 
   Future<void> _onInsertPageRef(
@@ -173,9 +186,8 @@ class InlinePageReferenceService {
       if (context.mounted) {
         return Dialogs.show(
           context,
-          child: FlowyErrorPage.message(
-            e.msg,
-            howToFix: LocaleKeys.errorDialog_howToFixFallback.tr(),
+          child: AppFlowyErrorPage(
+            error: e,
           ),
         );
       }
@@ -208,7 +220,7 @@ class InlinePageReferenceService {
         node,
         replace.$1,
         replace.$2,
-        '\$',
+        MentionBlockKeys.mentionChar,
         attributes: {
           MentionBlockKeys.mention: {
             MentionBlockKeys.type: MentionType.page.name,
@@ -219,4 +231,30 @@ class InlinePageReferenceService {
 
     await editorState.apply(transaction);
   }
+
+  InlineActionsMenuItem _fromView(ViewPB view) => InlineActionsMenuItem(
+        keywords: [view.nameOrDefault.toLowerCase()],
+        label: view.nameOrDefault,
+        icon: (onSelected) => view.icon.value.isNotEmpty
+            ? EmojiIconWidget(
+                emoji: view.icon.toEmojiIconData(),
+                emojiSize: 14,
+              )
+            : view.defaultIcon(),
+        onSelected: (context, editorState, menu, replace) => insertPage
+            ? _onInsertPageRef(view, context, editorState, replace)
+            : _onInsertLinkRef(view, context, editorState, menu, replace),
+      );
+
+// Future<InlineActionsMenuItem?> _fromSearchResult(
+//   SearchResultPB result,
+// ) async {
+//   final viewRes = await ViewBackendService.getView(result.viewId);
+//   final view = viewRes.toNullable();
+//   if (view == null) {
+//     return null;
+//   }
+
+//   return _fromView(view);
+// }
 }

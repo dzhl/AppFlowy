@@ -9,6 +9,7 @@
   "title": "Título",
   "youCanAlso": "Você também pode",
   "and": "e",
+  "failedToOpenUrl": "Falha ao abrir url: {}",
   "blockActions": {
     "addBelowTooltip": "Clique para adicionar abaixo",
     "addAboveCmd": "Alt+clique",
@@ -35,41 +36,92 @@
     "loginButtonText": "Conectar-se",
     "loginStartWithAnonymous": "Iniciar com uma sessão anônima",
     "continueAnonymousUser": "Continuar em uma sessão anônima",
+    "anonymous": "Anônimo",
     "buttonText": "Entre",
     "signingInText": "Entrando...",
     "forgotPassword": "Esqueceu sua senha?",
     "emailHint": "E-mail",
     "passwordHint": "Senha",
     "dontHaveAnAccount": "Não possui uma conta?",
+    "createAccount": "Criar uma conta",
     "repeatPasswordEmptyError": "Senha não pode estar em branco.",
     "unmatchedPasswordError": "As senhas não conferem.",
     "syncPromptMessage": "A sincronização dos dados pode demorar um pouco. Por favor não feche esta página",
     "or": "OU",
+    "signInWithGoogle": "Continuar com o Google",
+    "signInWithGithub": "Continuar com o Github",
+    "signInWithDiscord": "Continuar com o Discord",
+    "signInWithApple": "Continuar com a Apple",
+    "continueAnotherWay": "Continuar de outra forma",
+    "signUpWithGoogle": "Cadastro com o Google",
+    "signUpWithGithub": "Cadastro com o Github",
+    "signUpWithDiscord": "Cadastro com o Discord",
+    "signInWith": "Entrar com:",
+    "signInWithEmail": "Continuar com e-mail",
+    "signInWithMagicLink": "Continuar",
+    "signUpWithMagicLink": "Cadastro com um Link Mágico",
+    "pleaseInputYourEmail": "Por favor, insira seu endereço de e-mail",
+    "settings": "Configurações",
+    "magicLinkSent": "Link Mágico enviado!",
+    "invalidEmail": "Por favor, insira um endereço de e-mail válido",
+    "alreadyHaveAnAccount": "Já tem uma conta?",
+    "logIn": "Entrar",
+    "generalError": "Algo deu errado. Tente novamente mais tarde.",
+    "limitRateError": "Por razões de segurança, você só pode solicitar um link mágico a cada 60 segundos",
+    "magicLinkSentDescription": "Um Link Mágico foi enviado para seu e-mail. Clique no link para concluir seu login. O link expirará após 5 minutos.",
     "LogInWithGoogle": "Entrar com o Google",
     "LogInWithGithub": "Entrar com o Github",
     "LogInWithDiscord": "Entrar com o Discord",
-    "signInWith": "Entrar com:",
     "loginAsGuestButtonText": "Iniciar"
   },
   "workspace": {
     "chooseWorkspace": "Escolha seu espaço de trabalho",
     "create": "Crie um espaço de trabalho",
     "reset": "Redefinir espaço de trabalho",
+    "renameWorkspace": "Renomear espaço de trabalho",
     "resetWorkspacePrompt": "A redefinição do espaço de trabalho excluirá todas as páginas e dados contidos nele. Tem certeza de que deseja redefinir o espaço de trabalho? Alternativamente, você pode entrar em contato com a equipe de suporte para restaurar o espaço de trabalho",
     "hint": "Espaço de trabalho",
     "notFoundError": "Espaço de trabalho não encontrado",
-    "failedToLoad": "Algo deu errado! Falha ao carregar o espaço de trabalho. Tente fechar qualquer instância aberta do AppFlowy e tente novamente.",
+    "failedToLoad": "Algo deu errado! Falha ao carregar o espaço de trabalho. Tente fechar qualquer instância aberta do @:appName e tente novamente.",
     "errorActions": {
       "reportIssue": "Reporte um problema",
+      "reportIssueOnGithub": "Reportar um problema no Github",
+      "exportLogFiles": "Exportar arquivos de log",
       "reachOut": "Entre em contato no Discord"
-    }
+    },
+    "menuTitle": "Espaços de trabalho",
+    "deleteWorkspaceHintText": "Tem certeza de que deseja excluir o espaço de trabalho? Esta ação não pode ser desfeita, e quaisquer páginas que você tenha publicado deixarão de estar publicadas.",
+    "createSuccess": "Espaço de trabalho criado com sucesso",
+    "createFailed": "Falha ao criar espaço de trabalho",
+    "createLimitExceeded": "Você atingiu o limite máximo de espaços de trabalho permitido para sua conta. Se precisar de espaços de trabalho adicionais para continuar seu trabalho, solicite no Github",
+    "deleteSuccess": "Espaço de trabalho excluído com sucesso",
+    "deleteFailed": "Falha ao excluir o espaço de trabalho",
+    "openSuccess": "Espaço de trabalho aberto com sucesso",
+    "openFailed": "Falha ao abrir o espaço de trabalho",
+    "renameSuccess": "Espaço de trabalho renomeado com sucesso",
+    "renameFailed": "Falha ao renomear o espaço de trabalho",
+    "updateIconSuccess": "Ícone do espaço de trabalho atualizado com sucesso",
+    "updateIconFailed": "Falha ao atualizar ícone do espaço de trabalho",
+    "cannotDeleteTheOnlyWorkspace": "Não é possível excluir o único espaço de trabalho",
+    "fetchWorkspacesFailed": "Falha ao buscar espaços de trabalho",
+    "leaveCurrentWorkspace": "Sair do espaço de trabalho",
+    "leaveCurrentWorkspacePrompt": "Tem certeza de que deseja sair do espaço de trabalho atual?"
   },
   "shareAction": {
     "buttonText": "Compartilhar",
     "workInProgress": "Em breve",
     "markdown": "Marcador",
+    "clipboard": "Copiar para área de transferência",
     "csv": "CSV",
-    "copyLink": "Copiar link"
+    "copyLink": "Copiar link",
+    "publishToTheWeb": "Publicar na Web",
+    "publishToTheWebHint": "Crie um site com AppFlowy",
+    "publish": "Publicar",
+    "unPublish": "Remover publicação",
+    "visitSite": "Visitar site",
+    "exportAsTab": "Exportar como",
+    "publishTab": "Publicar",
+    "shareTab": "Compartilhar"
   },
   "moreAction": {
     "small": "pequeno",
@@ -77,7 +129,12 @@
     "large": "grande",
     "fontSize": "Tamanho da fonte",
     "import": "Importar",
-    "moreOptions": "Mais opções"
+    "moreOptions": "Mais opções",
+    "wordCount": "Contagem de palavras: {}",
+    "charCount": "Contagem de caracteres: {}",
+    "createdAt": "Criado: {}",
+    "deleteView": "Excluir",
+    "duplicateView": "Duplicar"
   },
   "importPanel": {
     "textAndMarkdown": "Texto e Remarcação",
@@ -95,7 +152,9 @@
     "openNewTab": "Abrir em uma nova guia",
     "moveTo": "Mover para",
     "addToFavorites": "Adicionar aos favoritos",
-    "copyLink": "Copiar link"
+    "copyLink": "Copiar link",
+    "changeIcon": "Alterar ícone",
+    "collapseAllPages": "Recolher todas as subpáginas"
   },
   "blankPageTitle": "Página em branco",
   "newPageText": "Nova página",
@@ -103,6 +162,34 @@
   "newGridText": "Nova grelha",
   "newCalendarText": "Novo calendário",
   "newBoardText": "Novo quadro",
+  "chat": {
+    "newChat": "Bate-papo com IA",
+    "inputMessageHint": "Pergunte a IA @:appName",
+    "inputLocalAIMessageHint": "Pergunte a IA local @:appName",
+    "unsupportedCloudPrompt": "Este recurso só está disponível ao usar a nuvem @:appName",
+    "relatedQuestion": "Relacionado",
+    "serverUnavailable": "Serviço Temporariamente Indisponível. Tente novamente mais tarde.",
+    "aiServerUnavailable": "🌈 Uh-oh! 🌈. Um unicórnio comeu nossa resposta. Por favor, tente novamente!",
+    "clickToRetry": "Clique para tentar novamente",
+    "regenerateAnswer": "Gerar novamente",
+    "question1": "Como usar Kanban para gerenciar tarefas",
+    "question2": "Explique o método GTD",
+    "question3": "Por que usar Rust",
+    "question4": "Receita com o que tenho na cozinha",
+    "aiMistakePrompt": "A IA pode cometer erros. Verifique informações importantes.",
+    "chatWithFilePrompt": "Você quer conversar com o arquivo?",
+    "indexFileSuccess": "Arquivo indexado com sucesso",
+    "inputActionNoPages": "Nenhum resultado",
+    "referenceSource": {
+      "zero": "0 fontes encontradas",
+      "one": "{count} fonte encontrada",
+      "other": "{count} fontes encontradas"
+    },
+    "clickToMention": "Clique para mencionar uma página",
+    "uploadFile": "Carregue arquivos PDFs, md ou txt para conversar",
+    "questionDetail": "Olá {}! Como posso te ajudar hoje?",
+    "indexingFile": "Indexando {}"
+  },
   "trash": {
     "text": "Lixeira",
     "restoreAll": "Restaurar tudo",
@@ -126,7 +213,8 @@
       "emptyDescription": "Você não tem nenhum arquivo excluído",
       "isDeleted": "foi deletado",
       "isRestored": "foi restaurado"
-    }
+    },
+    "confirmDeleteTitle": "Tem certeza de que deseja excluir esta página permanentemente?"
   },
   "deletePagePrompt": {
     "text": "Está página está na lixeira",
@@ -152,7 +240,7 @@
     "defaultNewPageName": "Sem título",
     "renameDialog": "Renomear"
   },
-  "noPagesInside": "Nenhuma página dentro",
+  "noPagesInside": "Sem páginas internas",
   "toolbar": {
     "undo": "Desfazer",
     "redo": "Refazer",
@@ -181,18 +269,52 @@
     "viewDataBase": "Visualizar banco de dados",
     "referencePage": "Esta {name} é uma referência",
     "addBlockBelow": "Adicione um bloco abaixo",
-    "urlLaunchAccessory": "Abrir com o navegador",
-    "urlCopyAccessory": "Copiar URL"
+    "aiGenerate": "Gerar"
   },
   "sideBar": {
     "closeSidebar": "Fechar barra lateral",
     "openSidebar": "Abrir barra lateral",
     "personal": "Pessoal",
+    "private": "Privado",
+    "workspace": "Espaço de trabalho",
     "favorites": "Favoritos",
+    "clickToHidePrivate": "Clique para ocultar o espaço privado\nAs páginas que você criou aqui são visíveis apenas para você",
+    "clickToHideWorkspace": "Clique para ocultar o espaço de trabalho\nAs páginas que você criou aqui são visíveis para todos os membros",
     "clickToHidePersonal": "Clique para ocultar a seção pessoal",
     "clickToHideFavorites": "Clique para ocultar a seção favorita",
     "addAPage": "Adicionar uma página",
-    "recent": "Recente"
+    "addAPageToPrivate": "Adicionar uma página ao espaço privado",
+    "addAPageToWorkspace": "Adicionar uma página ao espaço de trabalho",
+    "recent": "Recentes",
+    "today": "Hoje",
+    "thisWeek": "Essa semana",
+    "others": "Favoritos anteriores",
+    "justNow": "agora mesmo",
+    "minutesAgo": "{count} minutos atrás",
+    "lastViewed": "Última visualização",
+    "favoriteAt": "Favorito",
+    "emptyRecent": "Nenhum documento recente",
+    "emptyRecentDescription": "Conforme você visualiza os documentos, eles aparecerão aqui para fácil recuperação",
+    "emptyFavorite": "Nenhum documento favorito",
+    "emptyFavoriteDescription": "Comece a explorar e marque os documentos como favoritos. Eles serão listados aqui para acesso rápido!",
+    "removePageFromRecent": "Remover esta página dos Recentes?",
+    "removeSuccess": "Removido com sucesso",
+    "favoriteSpace": "Favoritos",
+    "RecentSpace": "Recente",
+    "Spaces": "Espaços",
+    "upgradeToPro": "Atualizar para Pro",
+    "upgradeToAIMax": "Desbloqueie IA ilimitada",
+    "storageLimitDialogTitle": "Você ficou sem armazenamento gratuito. Atualize para desbloquear armazenamento ilimitado",
+    "aiResponseLimitTitle": "Você ficou sem respostas de IA gratuitas. Atualize para o Plano Pro ou adquira um complemento de IA para desbloquear respostas ilimitadas",
+    "aiResponseLimitDialogTitle": "Limite de respostas de IA atingido",
+    "aiResponseLimit": "Você ficou sem respostas de IA gratuitas.\n\nVá para Configurações -> Plano -> Clique em AI Max ou Plano Pro para obter mais respostas de IA",
+    "askOwnerToUpgradeToPro": "Seu espaço de trabalho está ficando sem armazenamento gratuito. Peça ao proprietário do seu espaço de trabalho para atualizar para o Plano Pro",
+    "askOwnerToUpgradeToAIMax": "Seu espaço de trabalho está ficando sem respostas de IA gratuitas. Peça ao proprietário do seu espaço de trabalho para atualizar o plano ou adquirir complementos de IA",
+    "purchaseStorageSpace": "Adquirir espaço de armazenamento",
+    "purchaseAIResponse": "Adquirir ",
+    "askOwnerToUpgradeToLocalAI": "Peça ao proprietário do espaço de trabalho para habilitar a IA no dispositivo",
+    "upgradeToAILocal": "Execute modelos locais no seu dispositivo para máxima privacidade",
+    "upgradeToAILocalDesc": "Converse com PDFs, melhore sua escrita e preencha tabelas automaticamente usando IA local"
   },
   "notifications": {
     "export": {
@@ -208,6 +330,7 @@
   },
   "button": {
     "ok": "OK",
+    "confirm": "Confirmar",
     "done": "Feito",
     "cancel": "Cancelar",
     "signIn": "Conectar",
@@ -221,7 +344,7 @@
     "discard": "Descartar",
     "replace": "substituir",
     "insertBelow": "Inserir Abaixo",
-    "insertAbove": "Inserir acima",
+    "insertAbove": "Insira acima",
     "upload": "Carregar",
     "edit": "Editar",
     "delete": "Excluir",
@@ -230,14 +353,34 @@
     "update": "Atualizar",
     "share": "Compartilhar",
     "removeFromFavorites": "Remover dos favoritos",
+    "removeFromRecent": "Remover dos recentes",
     "addToFavorites": "Adicionar aos favoritos",
+    "favoriteSuccessfully": "Adicionado aos favoritos",
+    "unfavoriteSuccessfully": "Removido dos favoritos",
+    "duplicateSuccessfully": "Duplicado com sucesso",
     "rename": "Renomear",
     "helpCenter": "Central de Ajuda",
     "add": "Adicionar",
     "yes": "Sim",
-    "Done": "Feito",
-    "Cancel": "Cancelar",
-    "OK": "Ok",
+    "no": "Não",
+    "clear": "Limpar",
+    "remove": "Remover",
+    "dontRemove": "Não remova",
+    "copyLink": "Copiar Link",
+    "align": "Alinhar",
+    "login": "Entrar",
+    "logout": "Sair",
+    "deleteAccount": "Deletar conta",
+    "back": "Voltar",
+    "signInGoogle": "Continuar com o Google",
+    "signInGithub": "Continuar com o Github",
+    "signInDiscord": "Continuar com o Discord",
+    "more": "Mais",
+    "create": "Criar",
+    "close": "Fechar",
+    "next": "Próximo",
+    "previous": "Anterior",
+    "submit": "Enviar",
     "tryAGain": "Tentar novamente"
   },
   "label": {
@@ -262,6 +405,190 @@
   },
   "settings": {
     "title": "Configurações",
+    "popupMenuItem": {
+      "settings": "Configurações",
+      "members": "Membros",
+      "trash": "Lixo",
+      "helpAndSupport": "Ajuda e Suporte"
+    },
+    "accountPage": {
+      "menuLabel": "Minha conta",
+      "title": "Minha conta",
+      "general": {
+        "title": "Nome da conta e foto de perfil",
+        "changeProfilePicture": "Alterar foto do perfil"
+      },
+      "email": {
+        "title": "E-mail",
+        "actions": {
+          "change": "Alterar e-mail"
+        }
+      },
+      "login": {
+        "title": "Entrar com uma conta",
+        "loginLabel": "Entrar",
+        "logoutLabel": "Sair"
+      }
+    },
+    "workspacePage": {
+      "menuLabel": "Espaço de trabalho",
+      "title": "Espaço de trabalho",
+      "description": "Personalize a aparência do seu espaço de trabalho, tema, fonte, layout de texto, formato de data/hora e idioma.",
+      "workspaceName": {
+        "title": "Nome do espaço de trabalho"
+      },
+      "workspaceIcon": {
+        "title": "Ícone do espaço de trabalho",
+        "description": "Carregue uma imagem ou use um emoji para seu espaço de trabalho. O ícone será exibido na sua barra lateral e notificações."
+      },
+      "appearance": {
+        "title": "Aparência",
+        "description": "Personalize a aparência do seu espaço de trabalho, tema, fonte, layout de texto, data, hora e idioma.",
+        "options": {
+          "system": "Automático",
+          "light": "Claro",
+          "dark": "Escuro"
+        }
+      },
+      "resetCursorColor": {
+        "title": "Redefinir a cor do cursor do documento",
+        "description": "Tem certeza de que deseja redefinir a cor do cursor?"
+      },
+      "resetSelectionColor": {
+        "title": "Redefinir cor de seleção de documento",
+        "description": "Tem certeza de que deseja redefinir a cor de seleção?"
+      },
+      "theme": {
+        "title": "Tema",
+        "description": "Selecione um tema predefinido ou carregue seu próprio tema personalizado.",
+        "uploadCustomThemeTooltip": "Carregar um tema personalizado"
+      },
+      "workspaceFont": {
+        "title": "Fonte do espaço de trabalho",
+        "noFontHint": "Nenhuma fonte encontrada, tente outro termo."
+      },
+      "textDirection": {
+        "title": "Direção do texto",
+        "leftToRight": "Da esquerda para a direita",
+        "rightToLeft": "Da direita para a esquerda",
+        "auto": "Automático",
+        "enableRTLItems": "Habilitar items da barra de ferramenta da direita para a esquerda"
+      },
+      "layoutDirection": {
+        "title": "Direção do layout",
+        "leftToRight": "Da esquerda para a direita",
+        "rightToLeft": "Da direita para a esquerda"
+      },
+      "dateTime": {
+        "title": "Data e hora",
+        "example": "{} as {} ({})",
+        "24HourTime": "Tempo de 24 horas",
+        "dateFormat": {
+          "label": "Formato de data",
+          "us": "EUA",
+          "friendly": "Amigável"
+        }
+      },
+      "language": {
+        "title": "Língua"
+      },
+      "deleteWorkspacePrompt": {
+        "title": "Excluir espaço de trabalho",
+        "content": "Tem certeza de que deseja excluir este espaço de trabalho? Esta ação não pode ser desfeita, e quaisquer páginas que você tenha publicado deixarão de estar publicadas."
+      },
+      "leaveWorkspacePrompt": {
+        "title": "Sair do espaço de trabalho",
+        "content": "Tem certeza de que deseja sair deste espaço de trabalho? Você perderá o acesso a todas as páginas e dados dentro dele."
+      },
+      "manageWorkspace": {
+        "title": "Gerenciar espaço de trabalho",
+        "leaveWorkspace": "Sair do espaço de trabalho",
+        "deleteWorkspace": "Excluir espaço de trabalho"
+      }
+    },
+    "manageDataPage": {
+      "menuLabel": "Gerenciar dados",
+      "title": "Gerenciar dados",
+      "description": "Gerencie o armazenamento local de dados ou importe seus dados existentes para @:appName .",
+      "dataStorage": {
+        "title": "Local de armazenamento de arquivos",
+        "tooltip": "O local onde seus arquivos são armazenados",
+        "actions": {
+          "change": "Mudar caminho",
+          "open": "Abrir pasta",
+          "openTooltip": "Abrir local da pasta de dados atual",
+          "copy": "Copiar caminho",
+          "copiedHint": "Caminho copiado!",
+          "resetTooltip": "Redefinir para o local padrão"
+        },
+        "resetDialog": {
+          "title": "Tem certeza?",
+          "description": "Redefinir o caminho para o local de dados padrão não excluirá seus dados. Se você quiser reimportar seus dados atuais, você deve copiar o caminho do seu local atual primeiro."
+        }
+      },
+      "importData": {
+        "title": "Importar dados",
+        "tooltip": "Importar dados das pastas de backups/dados de @:appName",
+        "description": "Copiar dados de uma pasta de dados externa ao @:appName",
+        "action": "Selecionar arquivo"
+      },
+      "encryption": {
+        "title": "Criptografia",
+        "tooltip": "Gerencie como seus dados são armazenados e criptografados",
+        "descriptionNoEncryption": "Ativar a criptografia criptografará todos os dados. Isso não pode ser desfeito.",
+        "descriptionEncrypted": "Seus dados estão criptografados.",
+        "action": "Criptografar dados",
+        "dialog": {
+          "title": "Criptografar todos os seus dados?",
+          "description": "Criptografar todos os seus dados manterá seus dados seguros e protegidos. Esta ação NÃO pode ser desfeita. Tem certeza de que deseja continuar?"
+        }
+      },
+      "cache": {
+        "title": "Limpar cache",
+        "description": "Ajude a resolver problemas como imagem não carregando, páginas faltando em um espaço e fontes não carregando. Isso não afetará seus dados.",
+        "dialog": {
+          "title": "Limpar cache",
+          "description": "Ajude a resolver problemas como imagem não carregando, páginas faltando em um espaço e fontes não carregando. Isso não afetará seus dados.",
+          "successHint": "Cache limpo!"
+        }
+      },
+      "data": {
+        "fixYourData": "Corrija seus dados",
+        "fixButton": "Corrigir",
+        "fixYourDataDescription": "Se estiver com problemas com seus dados, você pode tentar corrigi-los aqui."
+      }
+    },
+    "shortcutsPage": {
+      "menuLabel": "Atalhos",
+      "title": "Atalhos",
+      "editBindingHint": "Insira uma nova combinação",
+      "searchHint": "Pesquisar",
+      "actions": {
+        "resetDefault": "Redefinir padrão"
+      },
+      "errorPage": {
+        "message": "Falha ao carregar atalhos: {}",
+        "howToFix": "Por favor, tente novamente. Se o problema persistir, entre em contato pelo GitHub."
+      },
+      "resetDialog": {
+        "title": "Redefinir atalhos",
+        "description": "Isso redefinirá todas as suas combinações de teclas para o padrão. Você não poderá desfazer isso depois. Tem certeza de que deseja continuar?",
+        "buttonLabel": "Redefinir"
+      },
+      "conflictDialog": {
+        "title": "{} já está em uso",
+        "descriptionPrefix": "Esta combinação de teclas está sendo usada atualmente por ",
+        "descriptionSuffix": ". Se você substituir esta combinação de teclas, ela será removida de {}.",
+        "confirmLabel": "Continuar"
+      },
+      "editTooltip": "Pressione para começar a editar a combinação de teclas",
+      "keybindings": {
+        "toggleToDoList": "Alternar para a lista de tarefas",
+        "insertNewParagraphInCodeblock": "Inserir novo parágrafo",
+        "pasteInCodeblock": "Colar bloco de código",
+        "selectAllCodeblock": "Selecionar tudo"
+      }
+    },
     "menu": {
       "appearance": "Aparência",
       "language": "Idioma",
@@ -281,11 +608,7 @@
       "cloudServerType": "Servidor em nuvem",
       "cloudServerTypeTip": "Observe que ele pode desconectar sua conta atual após mudar o servidor em nuvem",
       "cloudLocal": "Local",
-      "cloudSupabase": "Supabase",
-      "cloudSupabaseUrl": "URL da Supabase",
-      "cloudSupabaseAnonKey": "Chave anônima Supabase",
-      "cloudSupabaseAnonKeyCanNotBeEmpty": "A chave anon não pode estar vazia se o URL da supabase não estiver vazio",
-      "cloudAppFlowy": "AppFlowy Cloud",
+      "cloudAppFlowy": "@:appName Cloud Beta",
       "clickToCopy": "Clique para copiar",
       "selfHostStart": "Se você não possui um servidor, consulte o",
       "selfHostContent": "documento",
@@ -298,24 +621,23 @@
       "enableEncryptPrompt": "Ative a criptografia para proteger seus dados com este segredo. Armazene-o com segurança; uma vez ativado, não pode ser desativado. Se perdidos, seus dados se tornarão irrecuperáveis. Clique para copiar",
       "inputEncryptPrompt": "Por favor, insira seu segredo de criptografia para",
       "clickToCopySecret": "Clique para copiar o segredo",
-      "configServerSetting": "Defina as configurações do seu servidor",
+      "configServerSetting": "Configure seu servidor",
       "configServerGuide": "Após selecionar `Quick Start`, navegue até `Settings` e depois \"Cloud Settings\" para configurar seu servidor auto-hospedado.",
       "inputTextFieldHint": "Seu segredo",
       "historicalUserList": "Histórico de login do usuário",
       "historicalUserListTooltip": "Esta lista exibe suas contas anônimas. Você pode clicar em uma conta para ver seus detalhes. Contas anônimas são criadas clicando no botão ‘Começar’",
       "openHistoricalUser": "Clique para abrir a conta anônima",
-      "customPathPrompt": "Armazenar a pasta de dados do AppFlowy em uma pasta sincronizada na nuvem, como o Google Drive, pode representar riscos. Se o banco de dados nesta pasta for acessado ou modificado de vários locais ao mesmo tempo, isso poderá resultar em conflitos de sincronização e possível corrupção de dados",
-      "importAppFlowyData": "Importar dados da pasta AppFlowy externa",
-      "importAppFlowyDataDescription": "Copie dados de uma pasta de dados externa do AppFlowy e importe-os para a pasta de dados atual do AppFlowy",
-      "importSuccess": "Importou com sucesso a pasta de dados do AppFlowy",
-      "importFailed": "Falha ao importar a pasta de dados do AppFlowy",
-      "importGuide": "Para mais detalhes, consulte o documento referenciado",
-      "supabaseSetting": "Configuração de Supabase"
+      "customPathPrompt": "Armazenar a pasta de dados do @:appName em uma pasta sincronizada na nuvem, como o Google Drive, pode representar riscos. Se o banco de dados nesta pasta for acessado ou modificado de vários locais ao mesmo tempo, isso poderá resultar em conflitos de sincronização e possível corrupção de dados",
+      "importAppFlowyData": "Importar dados da pasta @:appName externa",
+      "importAppFlowyDataDescription": "Copie dados de uma pasta de dados externa do @:appName e importe-os para a pasta de dados atual do @:appName",
+      "importSuccess": "Importou com sucesso a pasta de dados do @:appName",
+      "importFailed": "Falha ao importar a pasta de dados do @:appName",
+      "importGuide": "Para mais detalhes, consulte o documento referenciado"
     },
     "notifications": {
       "enableNotifications": {
         "label": "Habilitar notificações",
-        "hint": "Desligue para impedir que notificações locais apareçam."
+        "hint": "Desligue para impedir notificações locais de aparecer"
       }
     },
     "appearance": {
@@ -359,7 +681,7 @@
       "themeUpload": {
         "button": "Carregar",
         "uploadTheme": "Carregar tema",
-        "description": "Carregue seu próprio tema AppFlowy usando o botão abaixo.",
+        "description": "Carregue seu próprio tema @:appName usando o botão abaixo.",
         "loading": "Aguarde enquanto validamos e carregamos seu tema...",
         "uploadSuccess": "Seu tema foi carregado com sucesso",
         "deletionFailure": "Falha ao excluir o tema. Tente excluí-lo manualmente.",
@@ -390,7 +712,7 @@
       "defaultLocation": "Onde os seus dados ficam armazenados",
       "exportData": "Exporte seus dados",
       "doubleTapToCopy": "Clique duas vezes para copiar o caminho",
-      "restoreLocation": "Restaurar para o caminho padrão do AppFlowy",
+      "restoreLocation": "Restaurar para o caminho padrão do @:appName",
       "customizeLocation": "Abrir outra pasta",
       "restartApp": "Reinicie o aplicativo para que as alterações entrem em vigor.",
       "exportDatabase": "Exportar banco de dados",
@@ -402,10 +724,10 @@
       "defineWhereYourDataIsStored": "Defina onde seus dados são armazenados",
       "open": "Abrir",
       "openFolder": "Abra uma pasta existente",
-      "openFolderDesc": "Gravar na pasta AppFlowy existente ...",
+      "openFolderDesc": "Gravar na pasta @:appName existente ...",
       "folderHintText": "nome da pasta",
       "location": "Criando nova pasta",
-      "locationDesc": "Escolha um nome para sua pasta de dados do AppFlowy",
+      "locationDesc": "Escolha um nome para sua pasta de dados do @:appName",
       "browser": "Navegar",
       "create": "Criar",
       "set": "Definir",
@@ -416,7 +738,7 @@
       "change": "Mudar",
       "openLocationTooltips": "Abra outro diretório de dados",
       "openCurrentDataFolder": "Abra o diretório de dados atual",
-      "recoverLocationTooltips": "Redefinir para o diretório de dados padrão do AppFlowy",
+      "recoverLocationTooltips": "Redefinir para o diretório de dados padrão do @:appName",
       "exportFileSuccess": "Exportar arquivo com sucesso!",
       "exportFileFail": "Falha na exportação do arquivo!",
       "export": "Exportar"
@@ -426,20 +748,9 @@
       "email": "E-mail",
       "tooltipSelectIcon": "Selecionar ícone",
       "selectAnIcon": "Escolha um ícone",
-      "pleaseInputYourOpenAIKey": "por favor insira sua chave OpenAI",
-      "pleaseInputYourStabilityAIKey": "insira sua chave Stability AI",
-      "clickToLogout": "Clique para sair do usuário atual"
-    },
-    "shortcuts": {
-      "shortcutsLabel": "Atalhos",
-      "command": "Comando",
-      "keyBinding": "Atalhos de teclado",
-      "addNewCommand": "Adicionar novo comando",
-      "updateShortcutStep": "Pressione a combinação de teclas desejada e pressione ENTER",
-      "shortcutIsAlreadyUsed": "Este atalho já é usado para: {conflict}",
-      "resetToDefault": "Redefinir para atalhos de teclado padrão",
-      "couldNotLoadErrorMsg": "Não foi possível carregar os atalhos. Tente novamente",
-      "couldNotSaveErrorMsg": "Não foi possível salvar os atalhos. Tente novamente"
+      "pleaseInputYourOpenAIKey": "por favor insira sua chave AI",
+      "clickToLogout": "Clique para sair do usuário atual",
+      "pleaseInputYourStabilityAIKey": "insira sua chave Stability AI"
     },
     "mobile": {
       "personalInfo": "Informações pessoais",
@@ -457,6 +768,27 @@
       "selectLayout": "Selecione o layout",
       "selectStartingDay": "Selecione o dia de início",
       "version": "Versão"
+    },
+    "shortcuts": {
+      "shortcutsLabel": "Atalhos",
+      "command": "Comando",
+      "keyBinding": "Atalhos de teclado",
+      "addNewCommand": "Adicionar novo comando",
+      "updateShortcutStep": "Pressione a combinação de teclas desejada e pressione ENTER",
+      "shortcutIsAlreadyUsed": "Este atalho já é usado para: {conflict}",
+      "resetToDefault": "Redefinir para atalhos de teclado padrão",
+      "couldNotLoadErrorMsg": "Não foi possível carregar os atalhos. Tente novamente",
+      "couldNotSaveErrorMsg": "Não foi possível salvar os atalhos. Tente novamente",
+      "commands": {
+        "codeBlockNewParagraph": "Bloco de código: insirir um novo parágrafo",
+        "codeBlockAddTwoSpaces": "Bloco de código: insirir dois espaços no início da linha",
+        "codeBlockSelectAll": "Bloco de código: selecionar tudo",
+        "codeBlockPasteText": "Bloco de códito: Colar texto",
+        "textAlignLeft": "Alinhar texto à esquerda",
+        "textAlignCenter": "Alinhar texto ao centro",
+        "textAlignRight": "Alinhar texto à direita",
+        "codeBlockDeleteTwoSpaces": "Bloco de código: excluir dois espaços no início da linha"
+      }
     }
   },
   "grid": {
@@ -478,7 +810,6 @@
       "typeAValue": "Digite um valor...",
       "layout": "Disposição",
       "databaseLayout": "Disposição",
-      "viewList": "Visualizações de banco de dados",
       "editView": "Editar visualização",
       "boardSettings": "Configurações do quadro",
       "calendarSettings": "Configurações do calendário",
@@ -486,7 +817,8 @@
       "duplicateView": "Visualização duplicada",
       "deleteView": "Excluir visualização",
       "numberOfVisibleFields": "{} mostrando",
-      "Properties": "Propriedades"
+      "Properties": "Propriedades",
+      "viewList": "Visualizações de banco de dados"
     },
     "textFilter": {
       "contains": "Contém",
@@ -516,13 +848,9 @@
       "isComplete": "está completo",
       "isIncomplted": "está imcompleto"
     },
-    "singleSelectOptionFilter": {
+    "selectOptionFilter": {
       "is": "Está",
       "isNot": "Não está",
-      "isEmpty": "Está vazio",
-      "isNotEmpty": "Não está vazio"
-    },
-    "multiSelectOptionFilter": {
       "contains": "Contém",
       "doesNotContain": "Não contém",
       "isEmpty": "Está vazio",
@@ -640,9 +968,7 @@
       "createNew": "Crie um novo",
       "orSelectOne": "Ou selecione uma opção",
       "typeANewOption": "Digite uma nova opção",
-      "tagName": "Nome da etiqueta",
-      "colorPannelTitle": "Cores",
-      "pannelTitle": "Escolha uma opção ou crie uma"
+      "tagName": "Nome da etiqueta"
     },
     "checklist": {
       "taskHint": "Descrição da tarefa",
@@ -650,6 +976,10 @@
       "submitNewTask": "Criar",
       "hideComplete": "Ocultar tarefas concluídas",
       "showComplete": "Mostrar todas as tarefas"
+    },
+    "url": {
+      "launch": "Abrir com o navegador",
+      "copy": "Copiar URL"
     },
     "menuName": "Grade",
     "referencedGridPrefix": "Vista de"
@@ -682,30 +1012,32 @@
       "codeBlock": "Bloco de código"
     },
     "plugins": {
-      "referencedBoard": "Quadro vinculado",
-      "referencedGrid": "Grade vinculado",
-      "referencedCalendar": "calendário referenciado",
+      "referencedBoard": "Quadro referenciado",
+      "referencedGrid": "Grade referenciada",
+      "referencedCalendar": "Calendário referenciado",
       "referencedDocument": "Referenciar um documento",
       "autoGeneratorMenuItemName": "Gerar nome automaticamente",
       "autoGeneratorTitleName": "Gerar por IA",
       "autoGeneratorLearnMore": "Saiba mais",
       "autoGeneratorGenerate": "Gerar",
       "autoGeneratorHintText": "Diga-nos o que você deseja gerar por IA ...",
-      "autoGeneratorCantGetOpenAIKey": "Não foi possível obter a chave da OpenAI",
+      "autoGeneratorCantGetOpenAIKey": "Não foi possível obter a chave da AI",
       "autoGeneratorRewrite": "Reescrever",
       "smartEdit": "Assistentes de IA",
-      "openAI": "OpenAI",
+      "aI": "AI",
       "smartEditFixSpelling": "Corrigir ortografia",
       "warning": "⚠️ As respostas da IA podem ser imprecisas ou enganosas.",
       "smartEditSummarize": "Resumir",
       "smartEditImproveWriting": "melhorar a escrita",
       "smartEditMakeLonger": "Faça mais",
-      "smartEditCouldNotFetchResult": "Não foi possível obter o resultado do OpenAI",
-      "smartEditCouldNotFetchKey": "Não foi possível obter a chave OpenAI",
-      "smartEditDisabled": "Conecte OpenAI em Configurações",
+      "smartEditCouldNotFetchResult": "Não foi possível obter o resultado do AI",
+      "smartEditCouldNotFetchKey": "Não foi possível obter a chave AI",
+      "smartEditDisabled": "Conecte AI em Configurações",
       "discardResponse": "Deseja descartar as respostas de IA?",
       "createInlineMathEquation": "Criar equação",
       "fonts": "Fontes",
+      "insertDate": "Inserir data",
+      "emoji": "Emoji",
       "toggleList": "Alternar lista",
       "quoteList": "Lista de citações",
       "numberedList": "Lista numerada",
@@ -758,8 +1090,8 @@
         "defaultColor": "Padrão"
       },
       "image": {
-        "copiedToPasteBoard": "O link da imagem foi copiado para a área de transferência",
-        "addAnImage": "Adicione uma imagem"
+        "addAnImage": "Adicione uma imagem",
+        "copiedToPasteBoard": "O link da imagem foi copiado para a área de transferência"
       },
       "urlPreview": {
         "copiedToPasteBoard": "O link foi copiado para a área de transferência"
@@ -808,8 +1140,8 @@
         "placeholder": "Insira o URL da imagem"
       },
       "ai": {
-        "label": "Gerar imagem da OpenAI",
-        "placeholder": "Insira o prompt para OpenAI gerar imagem"
+        "label": "Gerar imagem da AI",
+        "placeholder": "Insira o prompt para AI gerar imagem"
       },
       "stability_ai": {
         "label": "Gerar imagem da Stability AI",
@@ -830,12 +1162,12 @@
         "label": "Remover respingo"
       },
       "searchForAnImage": "Procurar uma imagem",
-      "pleaseInputYourOpenAIKey": "insira sua chave OpenAI na página configurações",
-      "pleaseInputYourStabilityAIKey": "insira sua chave Stability AI na página Configurações",
+      "pleaseInputYourOpenAIKey": "insira sua chave AI na página configurações",
       "saveImageToGallery": "Salvar imagem",
       "failedToAddImageToGallery": "Falha ao adicionar imagem à galeria",
       "successToAddImageToGallery": "Imagem adicionada à galeria com sucesso",
-      "unableToLoadImage": "Não foi possível carregar a imagem"
+      "unableToLoadImage": "Não foi possível carregar a imagem",
+      "pleaseInputYourStabilityAIKey": "insira sua chave Stability AI na página Configurações"
     },
     "codeBlock": {
       "language": {
@@ -907,9 +1239,9 @@
     "notesTooltip": "Notas dentro",
     "mobile": {
       "editURL": "Editar URL",
-      "unhideGroup": "Mostrar grupo",
-      "unhideGroupContent": "Tem certeza de que deseja mostrar este grupo no quadro?",
-      "faildToLoad": "Falha ao carregar a visualização do quadro"
+      "showGroup": "Mostrar grupo",
+      "showGroupContent": "Tem certeza de que deseja mostrar este grupo no quadro?",
+      "failedToLoad": "Falha ao carregar a visualização do quadro"
     }
   },
   "calendar": {
@@ -938,7 +1270,7 @@
     "quickJumpYear": "Ir para"
   },
   "errorDialog": {
-    "title": "Erro do AppFlowy",
+    "title": "Erro do @:appName",
     "howToFixFallback": "Lamentamos o inconveniente! Envie um problema em nossa página do GitHub que descreva seu erro.",
     "github": "Ver no GitHub"
   },

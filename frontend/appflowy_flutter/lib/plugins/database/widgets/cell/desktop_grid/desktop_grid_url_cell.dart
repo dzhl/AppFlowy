@@ -1,16 +1,18 @@
 import 'package:appflowy/generated/flowy_svgs.g.dart';
 import 'package:appflowy/generated/locale_keys.g.dart';
+import 'package:appflowy/plugins/database/application/cell/bloc/url_cell_bloc.dart';
 import 'package:appflowy/plugins/database/grid/presentation/layout/sizes.dart';
 import 'package:appflowy/plugins/database/widgets/row/accessory/cell_accessory.dart';
 import 'package:appflowy/plugins/database/widgets/row/cells/cell_container.dart';
-import 'package:appflowy/plugins/database/application/cell/bloc/url_cell_bloc.dart';
 import 'package:appflowy/workspace/presentation/home/toast.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:flowy_infra/size.dart';
 import 'package:flowy_infra/theme_extension.dart';
+import 'package:flowy_infra_ui/style_widget/hover.dart';
 import 'package:flowy_infra_ui/widget/flowy_tooltip.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:url_launcher/url_launcher_string.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../editable_cell_skeleton/url.dart';
 
@@ -24,28 +26,31 @@ class DesktopGridURLSkin extends IEditableURLCellSkin {
     TextEditingController textEditingController,
     URLCellDataNotifier cellDataNotifier,
   ) {
-    return TextField(
-      controller: textEditingController,
-      focusNode: focusNode,
-      maxLines: null,
-      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: Theme.of(context).colorScheme.primary,
-            decoration: TextDecoration.underline,
-          ),
-      decoration: InputDecoration(
-        contentPadding: GridSize.cellContentInsets,
-        border: InputBorder.none,
-        focusedBorder: InputBorder.none,
-        enabledBorder: InputBorder.none,
-        errorBorder: InputBorder.none,
-        disabledBorder: InputBorder.none,
-        hintStyle: Theme.of(context)
-            .textTheme
-            .bodyMedium
-            ?.copyWith(color: Theme.of(context).hintColor),
-        isDense: true,
+    return BlocSelector<URLCellBloc, URLCellState, bool>(
+      selector: (state) => state.wrap,
+      builder: (context, wrap) => TextField(
+        controller: textEditingController,
+        focusNode: focusNode,
+        maxLines: wrap ? null : 1,
+        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: Theme.of(context).colorScheme.primary,
+              decoration: TextDecoration.underline,
+            ),
+        decoration: InputDecoration(
+          contentPadding: GridSize.cellContentInsets,
+          border: InputBorder.none,
+          focusedBorder: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          errorBorder: InputBorder.none,
+          disabledBorder: InputBorder.none,
+          hintStyle: Theme.of(context)
+              .textTheme
+              .bodyMedium
+              ?.copyWith(color: Theme.of(context).hintColor),
+          isDense: true,
+        ),
+        onTapOutside: (_) => focusNode.unfocus(),
       ),
-      onTapOutside: (_) => focusNode.unfocus(),
     );
   }
 
@@ -115,7 +120,7 @@ class _CopyURLAccessoryState extends State<_CopyURLAccessory>
   Widget build(BuildContext context) {
     if (widget.cellDataNotifier.value.isNotEmpty) {
       return FlowyTooltip(
-        message: LocaleKeys.tooltip_urlCopyAccessory.tr(),
+        message: LocaleKeys.grid_url_copy.tr(),
         preferBelow: false,
         child: _URLAccessoryIconContainer(
           child: FlowySvg(
@@ -161,7 +166,7 @@ class _VisitURLAccessoryState extends State<_VisitURLAccessory>
   Widget build(BuildContext context) {
     if (widget.cellDataNotifier.value.isNotEmpty) {
       return FlowyTooltip(
-        message: LocaleKeys.tooltip_urlLaunchAccessory.tr(),
+        message: LocaleKeys.grid_url_launch.tr(),
         preferBelow: false,
         child: _URLAccessoryIconContainer(
           child: FlowySvg(
@@ -176,21 +181,10 @@ class _VisitURLAccessoryState extends State<_VisitURLAccessory>
   }
 
   @override
-  bool enable() {
-    return widget.cellDataNotifier.value.isNotEmpty;
-  }
+  bool enable() => widget.cellDataNotifier.value.isNotEmpty;
 
   @override
-  void onTap() {
-    final content = widget.cellDataNotifier.value;
-    if (content.isEmpty) {
-      return;
-    }
-    final shouldAddScheme =
-        !['http', 'https'].any((pattern) => content.startsWith(pattern));
-    final url = shouldAddScheme ? 'http://$content' : content;
-    canLaunchUrlString(url).then((value) => launchUrlString(url));
-  }
+  void onTap() => openUrlCellLink(widget.cellDataNotifier.value);
 }
 
 class _URLAccessoryIconContainer extends StatelessWidget {
@@ -200,12 +194,23 @@ class _URLAccessoryIconContainer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
+    return Container(
       width: 26,
       height: 26,
-      child: Padding(
-        padding: const EdgeInsets.all(3.0),
-        child: child,
+      decoration: BoxDecoration(
+        border: Border.fromBorderSide(
+          BorderSide(color: Theme.of(context).dividerColor),
+        ),
+        borderRadius: Corners.s6Border,
+      ),
+      child: FlowyHover(
+        style: HoverStyle(
+          backgroundColor: AFThemeExtension.of(context).background,
+          hoverColor: AFThemeExtension.of(context).lightGreyHover,
+        ),
+        child: Center(
+          child: child,
+        ),
       ),
     );
   }

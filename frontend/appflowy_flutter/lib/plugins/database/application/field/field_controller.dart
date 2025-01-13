@@ -1,30 +1,26 @@
-import 'package:appflowy/plugins/database/application/database_view_service.dart';
-import 'package:appflowy/plugins/database/application/field_settings/field_settings_listener.dart';
-import 'package:appflowy/plugins/database/application/field_settings/field_settings_service.dart';
-import 'package:appflowy/plugins/database/application/filter/filter_listener.dart';
-import 'package:appflowy/plugins/database/application/filter/filter_service.dart';
+import 'dart:collection';
+
 import 'package:appflowy/plugins/database/application/row/row_cache.dart';
 import 'package:appflowy/plugins/database/application/setting/setting_listener.dart';
-import 'package:appflowy/plugins/database/application/sort/sort_listener.dart';
-import 'package:appflowy/plugins/database/application/sort/sort_service.dart';
-import 'package:appflowy/plugins/database/grid/presentation/widgets/filter/filter_info.dart';
-import 'package:appflowy/plugins/database/grid/presentation/widgets/sort/sort_info.dart';
+import 'package:appflowy/plugins/database/domain/database_view_service.dart';
+import 'package:appflowy/plugins/database/domain/field_listener.dart';
+import 'package:appflowy/plugins/database/domain/field_settings_listener.dart';
+import 'package:appflowy/plugins/database/domain/field_settings_service.dart';
+import 'package:appflowy/plugins/database/domain/filter_listener.dart';
+import 'package:appflowy/plugins/database/domain/filter_service.dart';
+import 'package:appflowy/plugins/database/domain/sort_listener.dart';
+import 'package:appflowy/plugins/database/domain/sort_service.dart';
 import 'package:appflowy_backend/log.dart';
-import 'package:appflowy_backend/protobuf/flowy-database2/field_entities.pb.dart';
-import 'package:appflowy_backend/protobuf/flowy-database2/field_settings_entities.pb.dart';
-import 'package:appflowy_backend/protobuf/flowy-database2/filter_changeset.pb.dart';
-import 'package:appflowy_backend/protobuf/flowy-database2/group.pb.dart';
-import 'package:appflowy_backend/protobuf/flowy-database2/setting_entities.pb.dart';
-import 'package:appflowy_backend/protobuf/flowy-database2/sort_entities.pb.dart';
-import 'package:appflowy_backend/protobuf/flowy-database2/util.pb.dart';
+import 'package:appflowy_backend/protobuf/flowy-database2/protobuf.dart';
 import 'package:appflowy_backend/protobuf/flowy-error/errors.pb.dart';
+import 'package:appflowy_result/appflowy_result.dart';
 import 'package:collection/collection.dart';
-import 'package:dartz/dartz.dart';
 import 'package:flutter/foundation.dart';
 
 import '../setting/setting_service.dart';
 import 'field_info.dart';
-import 'field_listener.dart';
+import 'filter_entities.dart';
+import 'sort_entities.dart';
 
 class _GridFieldNotifier extends ChangeNotifier {
   List<FieldInfo> _fieldInfos = [];
@@ -43,9 +39,9 @@ class _GridFieldNotifier extends ChangeNotifier {
 }
 
 class _GridFilterNotifier extends ChangeNotifier {
-  List<FilterInfo> _filters = [];
+  List<DatabaseFilter> _filters = [];
 
-  set filters(List<FilterInfo> filters) {
+  set filters(List<DatabaseFilter> filters) {
     _filters = filters;
     notifyListeners();
   }
@@ -54,13 +50,13 @@ class _GridFilterNotifier extends ChangeNotifier {
     notifyListeners();
   }
 
-  List<FilterInfo> get filters => _filters;
+  List<DatabaseFilter> get filters => _filters;
 }
 
 class _GridSortNotifier extends ChangeNotifier {
-  List<SortInfo> _sorts = [];
+  List<DatabaseSort> _sorts = [];
 
-  set sorts(List<SortInfo> sorts) {
+  set sorts(List<DatabaseSort> sorts) {
     _sorts = sorts;
     notifyListeners();
   }
@@ -69,14 +65,14 @@ class _GridSortNotifier extends ChangeNotifier {
     notifyListeners();
   }
 
-  List<SortInfo> get sorts => _sorts;
+  List<DatabaseSort> get sorts => _sorts;
 }
 
 typedef OnReceiveUpdateFields = void Function(List<FieldInfo>);
+typedef OnReceiveField = void Function(FieldInfo);
 typedef OnReceiveFields = void Function(List<FieldInfo>);
-typedef OnReceiveFilters = void Function(List<FilterInfo>);
-typedef OnReceiveSorts = void Function(List<SortInfo>);
-typedef OnReceiveFieldSettings = void Function(List<FieldInfo>);
+typedef OnReceiveFilters = void Function(List<DatabaseFilter>);
+typedef OnReceiveSorts = void Function(List<DatabaseSort>);
 
 class FieldController {
   FieldController({required this.viewId})
@@ -136,105 +132,38 @@ class FieldController {
 
   // Getters
   List<FieldInfo> get fieldInfos => [..._fieldNotifier.fieldInfos];
-  List<FilterInfo> get filterInfos => [..._filterNotifier?.filters ?? []];
-  List<SortInfo> get sortInfos => [..._sortNotifier?.sorts ?? []];
+  List<DatabaseFilter> get filters => [..._filterNotifier?.filters ?? []];
+  List<DatabaseSort> get sorts => [..._sortNotifier?.sorts ?? []];
+  List<GroupSettingPB> get groupSettings =>
+      _groupConfigurationByFieldId.entries.map((e) => e.value).toList();
 
   FieldInfo? getField(String fieldId) {
     return _fieldNotifier.fieldInfos
         .firstWhereOrNull((element) => element.id == fieldId);
   }
 
-  FilterInfo? getFilterByFilterId(String filterId) {
+  DatabaseFilter? getFilterByFilterId(String filterId) {
     return _filterNotifier?.filters
         .firstWhereOrNull((element) => element.filterId == filterId);
   }
 
-  FilterInfo? getFilterByFieldId(String fieldId) {
+  DatabaseFilter? getFilterByFieldId(String fieldId) {
     return _filterNotifier?.filters
         .firstWhereOrNull((element) => element.fieldId == fieldId);
   }
 
-  SortInfo? getSortBySortId(String sortId) {
+  DatabaseSort? getSortBySortId(String sortId) {
     return _sortNotifier?.sorts
         .firstWhereOrNull((element) => element.sortId == sortId);
   }
 
-  SortInfo? getSortByFieldId(String fieldId) {
+  DatabaseSort? getSortByFieldId(String fieldId) {
     return _sortNotifier?.sorts
         .firstWhereOrNull((element) => element.fieldId == fieldId);
   }
 
   /// Listen for filter changes in the backend.
   void _listenOnFilterChanges() {
-    void deleteFilterFromChangeset(
-      List<FilterInfo> filters,
-      FilterChangesetNotificationPB changeset,
-    ) {
-      final deleteFilterIds = changeset.deleteFilters.map((e) => e.id).toList();
-      if (deleteFilterIds.isNotEmpty) {
-        filters.retainWhere(
-          (element) => !deleteFilterIds.contains(element.filter.id),
-        );
-      }
-    }
-
-    void insertFilterFromChangeset(
-      List<FilterInfo> filters,
-      FilterChangesetNotificationPB changeset,
-    ) {
-      for (final newFilter in changeset.insertFilters) {
-        final filterIndex =
-            filters.indexWhere((element) => element.filter.id == newFilter.id);
-        if (filterIndex == -1) {
-          final fieldInfo = _findFieldInfo(
-            fieldInfos: fieldInfos,
-            fieldId: newFilter.fieldId,
-            fieldType: newFilter.fieldType,
-          );
-          if (fieldInfo != null) {
-            filters.add(FilterInfo(viewId, newFilter, fieldInfo));
-          }
-        }
-      }
-    }
-
-    void updateFilterFromChangeset(
-      List<FilterInfo> filters,
-      FilterChangesetNotificationPB changeset,
-    ) {
-      for (final updatedFilter in changeset.updateFilters) {
-        final filterIndex = filters.indexWhere(
-          (element) => element.filter.id == updatedFilter.filterId,
-        );
-        // Remove the old filter
-        if (filterIndex != -1) {
-          filters.removeAt(filterIndex);
-        }
-
-        // Insert the filter if there is a filter and its field info is
-        // not null
-        if (updatedFilter.hasFilter()) {
-          final fieldInfo = _findFieldInfo(
-            fieldInfos: fieldInfos,
-            fieldId: updatedFilter.filter.fieldId,
-            fieldType: updatedFilter.filter.fieldType,
-          );
-
-          if (fieldInfo != null) {
-            // Insert the filter with the position: filterIndex, otherwise,
-            // append it to the end of the list.
-            final filterInfo =
-                FilterInfo(viewId, updatedFilter.filter, fieldInfo);
-            if (filterIndex != -1) {
-              filters.insert(filterIndex, filterInfo);
-            } else {
-              filters.add(filterInfo);
-            }
-          }
-        }
-      }
-    }
-
     _filtersListener.start(
       onFilterChanged: (result) {
         if (_isDisposed) {
@@ -243,18 +172,10 @@ class FieldController {
 
         result.fold(
           (FilterChangesetNotificationPB changeset) {
-            final List<FilterInfo> filters = filterInfos;
-            // delete removed filters
-            deleteFilterFromChangeset(filters, changeset);
-
-            // insert new filters
-            insertFilterFromChangeset(filters, changeset);
-
-            // edit modified filters
-            updateFilterFromChangeset(filters, changeset);
-
-            _filterNotifier?.filters = filters;
-            _updateFieldInfos();
+            _filterNotifier?.filters =
+                _filterListFromPBs(changeset.filters.items);
+            _fieldNotifier.fieldInfos =
+                _updateFieldInfos(_fieldNotifier.fieldInfos);
           },
           (err) => Log.error(err),
         );
@@ -265,69 +186,78 @@ class FieldController {
   /// Listen for sort changes in the backend.
   void _listenOnSortChanged() {
     void deleteSortFromChangeset(
-      List<SortInfo> newSortInfos,
+      List<DatabaseSort> newDatabaseSorts,
       SortChangesetNotificationPB changeset,
     ) {
       final deleteSortIds = changeset.deleteSorts.map((e) => e.id).toList();
       if (deleteSortIds.isNotEmpty) {
-        newSortInfos.retainWhere(
+        newDatabaseSorts.retainWhere(
           (element) => !deleteSortIds.contains(element.sortId),
         );
       }
     }
 
     void insertSortFromChangeset(
-      List<SortInfo> newSortInfos,
+      List<DatabaseSort> newDatabaseSorts,
       SortChangesetNotificationPB changeset,
     ) {
       for (final newSortPB in changeset.insertSorts) {
-        final sortIndex = newSortInfos
-            .indexWhere((element) => element.sortId == newSortPB.id);
+        final sortIndex = newDatabaseSorts
+            .indexWhere((element) => element.sortId == newSortPB.sort.id);
         if (sortIndex == -1) {
-          final fieldInfo = _findFieldInfo(
-            fieldInfos: fieldInfos,
-            fieldId: newSortPB.fieldId,
-            fieldType: newSortPB.fieldType,
+          newDatabaseSorts.insert(
+            newSortPB.index,
+            DatabaseSort.fromPB(newSortPB.sort),
           );
-
-          if (fieldInfo != null) {
-            newSortInfos.add(SortInfo(sortPB: newSortPB, fieldInfo: fieldInfo));
-          }
         }
       }
     }
 
     void updateSortFromChangeset(
-      List<SortInfo> newSortInfos,
+      List<DatabaseSort> newDatabaseSorts,
       SortChangesetNotificationPB changeset,
     ) {
       for (final updatedSort in changeset.updateSorts) {
-        final sortIndex = newSortInfos.indexWhere(
+        final newDatabaseSort = DatabaseSort.fromPB(updatedSort);
+
+        final sortIndex = newDatabaseSorts.indexWhere(
           (element) => element.sortId == updatedSort.id,
         );
-        // Remove the old filter
+
         if (sortIndex != -1) {
-          newSortInfos.removeAt(sortIndex);
-        }
-
-        final fieldInfo = _findFieldInfo(
-          fieldInfos: fieldInfos,
-          fieldId: updatedSort.fieldId,
-          fieldType: updatedSort.fieldType,
-        );
-
-        if (fieldInfo != null) {
-          final newSortInfo = SortInfo(
-            sortPB: updatedSort,
-            fieldInfo: fieldInfo,
-          );
-          if (sortIndex != -1) {
-            newSortInfos.insert(sortIndex, newSortInfo);
-          } else {
-            newSortInfos.add(newSortInfo);
-          }
+          newDatabaseSorts.removeAt(sortIndex);
+          newDatabaseSorts.insert(sortIndex, newDatabaseSort);
+        } else {
+          newDatabaseSorts.add(newDatabaseSort);
         }
       }
+    }
+
+    void updateFieldInfos(
+      List<DatabaseSort> newDatabaseSorts,
+      SortChangesetNotificationPB changeset,
+    ) {
+      final changedFieldIds = HashSet<String>.from([
+        ...changeset.insertSorts.map((sort) => sort.sort.fieldId),
+        ...changeset.updateSorts.map((sort) => sort.fieldId),
+        ...changeset.deleteSorts.map((sort) => sort.fieldId),
+        ...?_sortNotifier?.sorts.map((sort) => sort.fieldId),
+      ]);
+
+      final newFieldInfos = [...fieldInfos];
+
+      for (final fieldId in changedFieldIds) {
+        final index =
+            newFieldInfos.indexWhere((fieldInfo) => fieldInfo.id == fieldId);
+        if (index == -1) {
+          continue;
+        }
+        newFieldInfos[index] = newFieldInfos[index].copyWith(
+          hasSort: newDatabaseSorts.any((sort) => sort.fieldId == fieldId),
+        );
+      }
+
+      _fieldNotifier.fieldInfos = newFieldInfos;
     }
 
     _sortsListener.start(
@@ -337,12 +267,13 @@ class FieldController {
         }
         result.fold(
           (SortChangesetNotificationPB changeset) {
-            final List<SortInfo> newSortInfos = sortInfos;
-            deleteSortFromChangeset(newSortInfos, changeset);
-            insertSortFromChangeset(newSortInfos, changeset);
-            updateSortFromChangeset(newSortInfos, changeset);
+            final List<DatabaseSort> newDatabaseSorts = sorts;
+            deleteSortFromChangeset(newDatabaseSorts, changeset);
+            insertSortFromChangeset(newDatabaseSorts, changeset);
+            updateSortFromChangeset(newDatabaseSorts, changeset);
 
-            _sortNotifier?.sorts = newSortInfos;
+            updateFieldInfos(newDatabaseSorts, changeset);
+            _sortNotifier?.sorts = newDatabaseSorts;
           },
           (err) => Log.error(err),
         );
@@ -350,7 +281,7 @@ class FieldController {
     );
   }
 
-  /// Listen for databse setting changes in the backend.
+  /// Listen for database setting changes in the backend.
   void _listenOnSettingChanges() {
     _settingListener.start(
       onSettingUpdated: (result) {
@@ -466,7 +397,7 @@ class FieldController {
             (updatedFields, fieldInfos) =
                 await updateFields(changeset.updatedFields, fieldInfos);
 
-            _fieldNotifier.fieldInfos = fieldInfos;
+            _fieldNotifier.fieldInfos = _updateFieldInfos(fieldInfos);
             for (final listener in _updatedFieldCallbacks.values) {
               listener(updatedFields);
             }
@@ -479,9 +410,13 @@ class FieldController {
 
   /// Listen for field setting changes in the backend.
   void _listenOnFieldSettingsChanged() {
-    FieldInfo updateFieldSettings(FieldSettingsPB updatedFieldSettings) {
+    FieldInfo? updateFieldSettings(FieldSettingsPB updatedFieldSettings) {
       final List<FieldInfo> newFields = fieldInfos;
-      FieldInfo updatedField = newFields[0];
+      var updatedField = newFields.firstOrNull;
+
+      if (updatedField == null) {
+        return null;
+      }
 
       final index = newFields
           .indexWhere((field) => field.id == updatedFieldSettings.fieldId);
@@ -503,6 +438,10 @@ class FieldController {
         result.fold(
           (fieldSettings) {
             final updatedFieldInfo = updateFieldSettings(fieldSettings);
+            if (updatedFieldInfo == null) {
+              return;
+            }
+
             for (final listener in _updatedFieldCallbacks.values) {
               listener([updatedFieldInfo]);
             }
@@ -520,36 +459,33 @@ class FieldController {
       _groupConfigurationByFieldId[configuration.fieldId] = configuration;
     }
 
-    _filterNotifier?.filters = _filterInfoListFromPBs(setting.filters.items);
+    _filterNotifier?.filters = _filterListFromPBs(setting.filters.items);
 
-    _sortNotifier?.sorts = _sortInfoListFromPBs(setting.sorts.items);
+    _sortNotifier?.sorts = _sortListFromPBs(setting.sorts.items);
 
     _fieldSettings.clear();
     _fieldSettings.addAll(setting.fieldSettings.items);
 
-    _updateFieldInfos();
+    _fieldNotifier.fieldInfos = _updateFieldInfos(_fieldNotifier.fieldInfos);
   }
 
   /// Attach sort, filter, group information and field settings to `FieldInfo`
-  void _updateFieldInfos() {
-    final List<FieldInfo> newFieldInfos = [];
-    for (final field in _fieldNotifier.fieldInfos) {
-      newFieldInfos.add(
-        field.copyWith(
-          fieldSettings: _fieldSettings
-              .firstWhereOrNull((setting) => setting.fieldId == field.id),
-          isGroupField: _groupConfigurationByFieldId[field.id] != null,
-          hasFilter: getFilterByFieldId(field.id) != null,
-          hasSort: getSortByFieldId(field.id) != null,
-        ),
-      );
-    }
-
-    _fieldNotifier.fieldInfos = newFieldInfos;
+  List<FieldInfo> _updateFieldInfos(List<FieldInfo> fieldInfos) {
+    return fieldInfos
+        .map(
+          (field) => field.copyWith(
+            fieldSettings: _fieldSettings
+                .firstWhereOrNull((setting) => setting.fieldId == field.id),
+            isGroupField: _groupConfigurationByFieldId[field.id] != null,
+            hasFilter: getFilterByFieldId(field.id) != null,
+            hasSort: getSortByFieldId(field.id) != null,
+          ),
+        )
+        .toList();
   }
 
   /// Load all of the fields. This is required when opening the database
-  Future<Either<Unit, FlowyError>> loadFields({
+  Future<FlowyResult<void, FlowyError>> loadFields({
     required List<FieldIdPB> fieldIds,
   }) async {
     final result = await _databaseViewBackendSvc.getFields(fieldIds: fieldIds);
@@ -557,7 +493,7 @@ class FieldController {
       () => result.fold(
         (newFields) async {
           if (_isDisposed) {
-            return left(unit);
+            return FlowyResult.success(null);
           }
 
           _fieldNotifier.fieldInfos =
@@ -568,56 +504,57 @@ class FieldController {
             _loadAllFieldSettings(),
             _loadSettings(),
           ]);
-          _updateFieldInfos();
+          _fieldNotifier.fieldInfos =
+              _updateFieldInfos(_fieldNotifier.fieldInfos);
 
-          return left(unit);
+          return FlowyResult.success(null);
         },
-        (err) => right(err),
+        (err) => FlowyResult.failure(err),
       ),
     );
   }
 
   /// Load all the filters from the backend. Required by `loadFields`
-  Future<Either<Unit, FlowyError>> _loadFilters() async {
+  Future<FlowyResult<void, FlowyError>> _loadFilters() async {
     return _filterBackendSvc.getAllFilters().then((result) {
       return result.fold(
         (filterPBs) {
-          _filterNotifier?.filters = _filterInfoListFromPBs(filterPBs);
-          return left(unit);
+          _filterNotifier?.filters = _filterListFromPBs(filterPBs);
+          return FlowyResult.success(null);
         },
-        (err) => right(err),
+        (err) => FlowyResult.failure(err),
       );
     });
   }
 
   /// Load all the sorts from the backend. Required by `loadFields`
-  Future<Either<Unit, FlowyError>> _loadSorts() async {
+  Future<FlowyResult<void, FlowyError>> _loadSorts() async {
     return _sortBackendSvc.getAllSorts().then((result) {
       return result.fold(
         (sortPBs) {
-          _sortNotifier?.sorts = _sortInfoListFromPBs(sortPBs);
-          return left(unit);
+          _sortNotifier?.sorts = _sortListFromPBs(sortPBs);
+          return FlowyResult.success(null);
         },
-        (err) => right(err),
+        (err) => FlowyResult.failure(err),
       );
     });
   }
 
   /// Load all the field settings from the backend. Required by `loadFields`
-  Future<Either<Unit, FlowyError>> _loadAllFieldSettings() async {
+  Future<FlowyResult<void, FlowyError>> _loadAllFieldSettings() async {
     return _fieldSettingsBackendSvc.getAllFieldSettings().then((result) {
       return result.fold(
         (fieldSettingsList) {
           _fieldSettings.clear();
           _fieldSettings.addAll(fieldSettingsList);
-          return left(unit);
+          return FlowyResult.success(null);
         },
-        (err) => right(err),
+        (err) => FlowyResult.failure(err),
       );
     });
   }
 
-  Future<Either<Unit, FlowyError>> _loadSettings() async {
+  Future<FlowyResult<void, FlowyError>> _loadSettings() async {
     return SettingBackendService(viewId: viewId).getSetting().then(
           (result) => result.fold(
             (setting) {
@@ -626,47 +563,21 @@ class FieldController {
                 _groupConfigurationByFieldId[configuration.fieldId] =
                     configuration;
               }
-              return left(unit);
+              return FlowyResult.success(null);
             },
-            (err) => right(err),
+            (err) => FlowyResult.failure(err),
           ),
         );
   }
 
   /// Attach corresponding `FieldInfo`s to the `FilterPB`s
-  List<FilterInfo> _filterInfoListFromPBs(List<FilterPB> filterPBs) {
-    FilterInfo? getFilterInfo(FilterPB filterPB) {
-      final fieldInfo = _findFieldInfo(
-        fieldInfos: fieldInfos,
-        fieldId: filterPB.fieldId,
-        fieldType: filterPB.fieldType,
-      );
-      return fieldInfo != null ? FilterInfo(viewId, filterPB, fieldInfo) : null;
-    }
-
-    return filterPBs
-        .map((filterPB) => getFilterInfo(filterPB))
-        .whereType<FilterInfo>()
-        .toList();
+  List<DatabaseFilter> _filterListFromPBs(List<FilterPB> filterPBs) {
+    return filterPBs.map(DatabaseFilter.fromPB).toList();
   }
 
   /// Attach corresponding `FieldInfo`s to the `SortPB`s
-  List<SortInfo> _sortInfoListFromPBs(List<SortPB> sortPBs) {
-    SortInfo? getSortInfo(SortPB sortPB) {
-      final fieldInfo = _findFieldInfo(
-        fieldInfos: fieldInfos,
-        fieldId: sortPB.fieldId,
-        fieldType: sortPB.fieldType,
-      );
-      return fieldInfo != null
-          ? SortInfo(sortPB: sortPB, fieldInfo: fieldInfo)
-          : null;
-    }
-
-    return sortPBs
-        .map((sortPB) => getSortInfo(sortPB))
-        .whereType<SortInfo>()
-        .toList();
+  List<DatabaseSort> _sortListFromPBs(List<SortPB> sortPBs) {
+    return sortPBs.map(DatabaseSort.fromPB).toList();
   }
 
   void addListener({
@@ -704,7 +615,7 @@ class FieldController {
         if (listenWhen != null && listenWhen() == false) {
           return;
         }
-        onFilters(filterInfos);
+        onFilters(filters);
       }
 
       _filterCallbacks[onFilters] = callback;
@@ -716,12 +627,37 @@ class FieldController {
         if (listenWhen != null && listenWhen() == false) {
           return;
         }
-        onSorts(sortInfos);
+        onSorts(sorts);
       }
 
       _sortCallbacks[onSorts] = callback;
       _sortNotifier?.addListener(callback);
     }
+  }
+
+  void addSingleFieldListener(
+    String fieldId, {
+    required OnReceiveField onFieldChanged,
+    bool Function()? listenWhen,
+  }) {
+    void key(List<FieldInfo> fieldInfos) {
+      final fieldInfo = fieldInfos.firstWhereOrNull(
+        (fieldInfo) => fieldInfo.id == fieldId,
+      );
+      if (fieldInfo != null) {
+        onFieldChanged(fieldInfo);
+      }
+    }
+
+    void callback() {
+      if (listenWhen != null && listenWhen() == false) {
+        return;
+      }
+      key(fieldInfos);
+    }
+
+    _fieldCallbacks[key] = callback;
+    _fieldNotifier.addListener(callback);
   }
 
   void removeListener({
@@ -748,6 +684,25 @@ class FieldController {
       if (callback != null) {
         _sortNotifier?.removeListener(callback);
       }
+    }
+  }
+
+  void removeSingleFieldListener({
+    required String fieldId,
+    required OnReceiveField onFieldChanged,
+  }) {
+    void key(List<FieldInfo> fieldInfos) {
+      final fieldInfo = fieldInfos.firstWhereOrNull(
+        (fieldInfo) => fieldInfo.id == fieldId,
+      );
+      if (fieldInfo != null) {
+        onFieldChanged(fieldInfo);
+      }
+    }
+
+    final callback = _fieldCallbacks.remove(key);
+    if (callback != null) {
+      _fieldNotifier.removeListener(callback);
     }
   }
 
@@ -810,14 +765,4 @@ class RowCacheDependenciesImpl extends RowFieldsDelegate with RowLifeCycle {
       _onFieldFn = null;
     }
   }
-}
-
-FieldInfo? _findFieldInfo({
-  required List<FieldInfo> fieldInfos,
-  required String fieldId,
-  required FieldType fieldType,
-}) {
-  return fieldInfos.firstWhereOrNull(
-    (element) => element.id == fieldId && element.fieldType == fieldType,
-  );
 }

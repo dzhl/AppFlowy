@@ -1,9 +1,12 @@
+import 'package:appflowy/plugins/inline_actions/handlers/child_page.dart';
 import 'package:appflowy/plugins/inline_actions/handlers/inline_page_reference.dart';
 import 'package:appflowy/plugins/inline_actions/inline_actions_menu.dart';
 import 'package:appflowy/plugins/inline_actions/inline_actions_result.dart';
 import 'package:appflowy/plugins/inline_actions/inline_actions_service.dart';
+import 'package:appflowy/shared/feature_flags.dart';
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:flutter/material.dart';
+import 'package:universal_platform/universal_platform.dart';
 
 const _bracketChar = '[';
 const _plusChar = '+';
@@ -53,7 +56,7 @@ Future<bool> inlinePageReferenceCommandHandler(
   String? previousChar,
 }) async {
   final selection = editorState.selection;
-  if (PlatformExtension.isMobile || selection == null) {
+  if (UniversalPlatform.isMobile || selection == null) {
     return false;
   }
 
@@ -79,14 +82,19 @@ Future<bool> inlinePageReferenceCommandHandler(
     }
   }
 
-  // ignore: use_build_context_synchronously
+  if (!context.mounted) {
+    return false;
+  }
+
   final service = InlineActionsService(
     context: context,
     handlers: [
+      if (FeatureFlag.inlineSubPageMention.isOn)
+        InlineChildPageService(currentViewId: currentViewId),
       InlinePageReferenceService(
         currentViewId: currentViewId,
         limitResults: 10,
-      ).inlinePageReferenceDelegate,
+      ),
     ],
   );
 
@@ -94,7 +102,7 @@ Future<bool> inlinePageReferenceCommandHandler(
 
   final List<InlineActionsResult> initialResults = [];
   for (final handler in service.handlers) {
-    final group = await handler();
+    final group = await handler.search(null);
 
     if (group.results.isNotEmpty) {
       initialResults.add(group);
@@ -109,10 +117,40 @@ Future<bool> inlinePageReferenceCommandHandler(
       initialResults: initialResults,
       style: style,
       startCharAmount: previousChar != null ? 2 : 1,
+      cancelBySpaceHandler: () {
+        if (character == _plusChar) {
+          final currentSelection = editorState.selection;
+          if (currentSelection == null) {
+            return false;
+          }
+          // check if the space is after the character
+          if (currentSelection.isCollapsed &&
+              currentSelection.start.offset ==
+                  selection.start.offset + character.length) {
+            _cancelInlinePageReferenceMenu(editorState);
+            return true;
+          }
+        }
+        return false;
+      },
     );
 
     selectionMenuService?.show();
   }
 
   return true;
+}
+
+void _cancelInlinePageReferenceMenu(EditorState editorState) {
+  selectionMenuService?.dismiss();
+  selectionMenuService = null;
+
+  // re-focus the selection
+  final selection = editorState.selection;
+  if (selection != null) {
+    editorState.updateSelectionWithReason(
+      selection,
+      reason: SelectionUpdateReason.uiEvent,
+    );
+  }
 }

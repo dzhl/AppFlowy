@@ -1,10 +1,9 @@
-import 'package:appflowy/generated/flowy_svgs.g.dart';
 import 'package:appflowy/generated/locale_keys.g.dart';
-import 'package:appflowy/plugins/database/application/field/field_controller.dart';
 import 'package:appflowy/plugins/database/application/field/field_info.dart';
-import 'package:appflowy/plugins/database/grid/application/sort/sort_create_bloc.dart';
+import 'package:appflowy/plugins/database/grid/application/simple_text_filter_bloc.dart';
+import 'package:appflowy/plugins/database/grid/application/sort/sort_editor_bloc.dart';
 import 'package:appflowy/plugins/database/grid/presentation/layout/sizes.dart';
-import 'package:appflowy/util/field_type_extension.dart';
+import 'package:appflowy/plugins/database/grid/presentation/widgets/header/desktop_field_cell.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flowy_infra/theme_extension.dart';
 import 'package:flowy_infra_ui/style_widget/button.dart';
@@ -15,55 +14,42 @@ import 'package:flowy_infra_ui/widget/spacing.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-class GridCreateSortList extends StatefulWidget {
-  const GridCreateSortList({
+class CreateDatabaseViewSortList extends StatelessWidget {
+  const CreateDatabaseViewSortList({
     super.key,
-    required this.viewId,
-    required this.fieldController,
-    required this.onClosed,
-    this.onCreateSort,
+    required this.onTap,
   });
 
-  final String viewId;
-  final FieldController fieldController;
-  final VoidCallback onClosed;
-  final VoidCallback? onCreateSort;
-
-  @override
-  State<StatefulWidget> createState() => _GridCreateSortListState();
-}
-
-class _GridCreateSortListState extends State<GridCreateSortList> {
-  late CreateSortBloc editBloc;
-
-  @override
-  void initState() {
-    editBloc = CreateSortBloc(
-      viewId: widget.viewId,
-      fieldController: widget.fieldController,
-    )..add(const CreateSortEvent.initial());
-    super.initState();
-  }
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider.value(
-      value: editBloc,
-      child: BlocListener<CreateSortBloc, CreateSortState>(
+    final sortBloc = context.read<SortEditorBloc>();
+    return BlocProvider(
+      create: (_) => SimpleTextFilterBloc<FieldInfo>(
+        values: List.from(sortBloc.state.creatableFields),
+        comparator: (val) => val.name,
+      ),
+      child: BlocListener<SortEditorBloc, SortEditorState>(
+        listenWhen: (previous, current) =>
+            previous.creatableFields != current.creatableFields,
         listener: (context, state) {
-          if (state.didCreateSort) {
-            widget.onClosed();
-          }
+          context.read<SimpleTextFilterBloc<FieldInfo>>().add(
+                SimpleTextFilterEvent.receiveNewValues(state.creatableFields),
+              );
         },
-        child: BlocBuilder<CreateSortBloc, CreateSortState>(
+        child: BlocBuilder<SimpleTextFilterBloc<FieldInfo>,
+            SimpleTextFilterState<FieldInfo>>(
           builder: (context, state) {
-            final cells = state.creatableFields.map((fieldInfo) {
-              return SizedBox(
-                height: GridSize.popoverItemHeight,
-                child: GridSortPropertyCell(
-                  fieldInfo: fieldInfo,
-                  onTap: (fieldInfo) => createSort(fieldInfo),
-                ),
+            final cells = state.values.map((fieldInfo) {
+              return GridSortPropertyCell(
+                fieldInfo: fieldInfo,
+                onTap: () {
+                  context
+                      .read<SortEditorBloc>()
+                      .add(SortEditorEvent.createSort(fieldId: fieldInfo.id));
+                  onTap.call();
+                },
               );
             }).toList();
 
@@ -76,12 +62,9 @@ class _GridCreateSortListState extends State<GridCreateSortList> {
                 child: ListView.separated(
                   shrinkWrap: true,
                   itemCount: cells.length,
-                  itemBuilder: (BuildContext context, int index) {
-                    return cells[index];
-                  },
-                  separatorBuilder: (BuildContext context, int index) {
-                    return VSpace(GridSize.typeOptionSeparatorHeight);
-                  },
+                  itemBuilder: (_, index) => cells[index],
+                  separatorBuilder: (_, __) =>
+                      VSpace(GridSize.typeOptionSeparatorHeight),
                 ),
               ),
             ];
@@ -94,17 +77,6 @@ class _GridCreateSortListState extends State<GridCreateSortList> {
         ),
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    editBloc.close();
-    super.dispose();
-  }
-
-  void createSort(FieldInfo field) {
-    editBloc.add(CreateSortEvent.createDefaultSort(field));
-    widget.onCreateSort?.call();
   }
 }
 
@@ -127,8 +99,8 @@ class _SortTextFieldDelegate extends SliverPersistentHeaderDelegate {
         hintText: LocaleKeys.grid_settings_sortBy.tr(),
         onChanged: (text) {
           context
-              .read<CreateSortBloc>()
-              .add(CreateSortEvent.didReceiveFilterText(text));
+              .read<SimpleTextFilterBloc<FieldInfo>>()
+              .add(SimpleTextFilterEvent.updateFilter(text));
         },
       ),
     );
@@ -141,9 +113,7 @@ class _SortTextFieldDelegate extends SliverPersistentHeaderDelegate {
   double get minExtent => fixHeight;
 
   @override
-  bool shouldRebuild(covariant SliverPersistentHeaderDelegate oldDelegate) {
-    return false;
-  }
+  bool shouldRebuild(covariant oldDelegate) => false;
 }
 
 class GridSortPropertyCell extends StatelessWidget {
@@ -154,20 +124,23 @@ class GridSortPropertyCell extends StatelessWidget {
   });
 
   final FieldInfo fieldInfo;
-  final Function(FieldInfo) onTap;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return FlowyButton(
-      hoverColor: AFThemeExtension.of(context).lightGreyHover,
-      text: FlowyText.medium(
-        fieldInfo.name,
-        color: AFThemeExtension.of(context).textColor,
-      ),
-      onTap: () => onTap(fieldInfo),
-      leftIcon: FlowySvg(
-        fieldInfo.fieldType.svgData,
-        color: Theme.of(context).iconTheme.color,
+    return SizedBox(
+      height: GridSize.popoverItemHeight,
+      child: FlowyButton(
+        hoverColor: AFThemeExtension.of(context).lightGreyHover,
+        text: FlowyText(
+          fieldInfo.name,
+          lineHeight: 1.0,
+          color: AFThemeExtension.of(context).textColor,
+        ),
+        onTap: onTap,
+        leftIcon: FieldIcon(
+          fieldInfo: fieldInfo,
+        ),
       ),
     );
   }

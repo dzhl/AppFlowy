@@ -1,5 +1,3 @@
-import 'package:flutter/material.dart';
-
 import 'package:appflowy/plugins/document/application/document_data_pb_extension.dart';
 import 'package:appflowy/plugins/document/application/prelude.dart';
 import 'package:appflowy/user/application/reminder/reminder_bloc.dart';
@@ -12,7 +10,8 @@ import 'package:appflowy_backend/protobuf/flowy-error/errors.pb.dart';
 import 'package:appflowy_backend/protobuf/flowy-folder/view.pb.dart';
 import 'package:appflowy_backend/protobuf/flowy-user/reminder.pb.dart';
 import 'package:appflowy_editor/appflowy_editor.dart';
-import 'package:dartz/dartz.dart';
+import 'package:appflowy_result/appflowy_result.dart';
+import 'package:flutter/material.dart';
 
 /// Displays a Lsit of Notifications, currently used primarily to
 /// display Reminders.
@@ -27,7 +26,6 @@ class NotificationsView extends StatelessWidget {
     required this.views,
     this.isUpcoming = false,
     this.onAction,
-    this.onDelete,
     this.onReadChanged,
     this.actionBar,
   });
@@ -37,7 +35,6 @@ class NotificationsView extends StatelessWidget {
   final List<ViewPB> views;
   final bool isUpcoming;
   final Function(ReminderPB reminder, int? path, ViewPB? view)? onAction;
-  final Function(ReminderPB reminder)? onDelete;
   final Function(ReminderPB reminder, bool isRead)? onReadChanged;
   final Widget? actionBar;
 
@@ -66,7 +63,7 @@ class NotificationsView extends StatelessWidget {
 
                     final documentService = DocumentService();
                     final documentFuture = documentService.openDocument(
-                      viewId: reminder.objectId,
+                      documentId: reminder.objectId,
                     );
 
                     Future<Node?>? nodeBuilder;
@@ -77,7 +74,7 @@ class NotificationsView extends StatelessWidget {
 
                     final view = views.findView(reminder.objectId);
                     return NotificationItem(
-                      reminderId: reminder.id,
+                      reminder: reminder,
                       key: ValueKey(reminder.id),
                       title: reminder.title,
                       scheduled: reminder.scheduledAt,
@@ -88,7 +85,6 @@ class NotificationsView extends StatelessWidget {
                       readOnly: isUpcoming,
                       onReadChanged: (isRead) =>
                           onReadChanged?.call(reminder, isRead),
-                      onDelete: () => onDelete?.call(reminder),
                       onAction: (path) => onAction?.call(reminder, path, view),
                       view: view,
                     );
@@ -103,12 +99,12 @@ class NotificationsView extends StatelessWidget {
   }
 
   Future<Node?> _getNodeFromDocument(
-    Future<Either<FlowyError, DocumentDataPB>> documentFuture,
+    Future<FlowyResult<DocumentDataPB, FlowyError>> documentFuture,
     String blockId,
   ) async {
     final document = (await documentFuture).fold(
-      (l) => null,
       (document) => document,
+      (_) => null,
     );
 
     if (document == null) {

@@ -1,10 +1,11 @@
 import 'package:appflowy/env/cloud_env.dart';
 import 'package:appflowy/env/env.dart';
 import 'package:appflowy/generated/locale_keys.g.dart';
-import 'package:appflowy/mobile/presentation/base/app_bar.dart';
+import 'package:appflowy/mobile/presentation/base/app_bar/app_bar.dart';
 import 'package:appflowy/mobile/presentation/presentation.dart';
 import 'package:appflowy/mobile/presentation/setting/cloud/cloud_setting_group.dart';
 import 'package:appflowy/mobile/presentation/setting/user_session_setting_group.dart';
+import 'package:appflowy/mobile/presentation/setting/workspace/workspace_setting_group.dart';
 import 'package:appflowy/mobile/presentation/widgets/widgets.dart';
 import 'package:appflowy/startup/startup.dart';
 import 'package:appflowy/user/application/auth/auth_service.dart';
@@ -35,12 +36,15 @@ class _MobileHomeSettingPageState extends State<MobileHomeSettingPage> {
           return const Center(child: CircularProgressIndicator.adaptive());
         }
 
-        final userProfile = snapshot.data?.fold((error) {
-          errorMsg = error.msg;
-          return null;
-        }, (userProfile) {
-          return userProfile;
-        });
+        final userProfile = snapshot.data?.fold(
+          (userProfile) {
+            return userProfile;
+          },
+          (error) {
+            errorMsg = error.msg;
+            return null;
+          },
+        );
 
         return Scaffold(
           appBar: FlowyAppBar(
@@ -76,14 +80,14 @@ class _MobileHomeSettingPageState extends State<MobileHomeSettingPage> {
             PersonalInfoSettingGroup(
               userProfile: userProfile,
             ),
-            // TODO: Enable and implement along with Push Notifications
-            // const NotificationsSettingGroup(),
+            const WorkspaceSettingGroup(),
             const AppearanceSettingGroup(),
             const LanguageSettingGroup(),
             if (Env.enableCustomCloud) const CloudSettingGroup(),
             const SupportSettingGroup(),
             const AboutSettingGroup(),
             UserSessionSettingGroup(
+              userProfile: userProfile,
               showThirdPartyLogin: showThirdPartyLogin,
             ),
             const VSpace(20),

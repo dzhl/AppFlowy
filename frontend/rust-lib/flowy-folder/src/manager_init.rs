@@ -1,18 +1,15 @@
-use std::sync::{Arc, Weak};
-
-use collab_folder::{Folder, FolderNotify, UserId};
-use tracing::{event, Level};
-
-use collab_integrate::CollabKVDB;
-use flowy_error::{ErrorCode, FlowyError, FlowyResult};
-
 use crate::manager::{FolderInitDataSource, FolderManager};
-use crate::manager_observer::{
-  subscribe_folder_snapshot_state_changed, subscribe_folder_sync_state_changed,
-  subscribe_folder_trash_changed, subscribe_folder_view_changed,
-};
+use crate::manager_observer::*;
 use crate::user_default::DefaultFolderBuilder;
-use crate::util::is_exist_in_local_disk;
+use collab::core::collab::DataSource;
+use collab::lock::RwLock;
+use collab_entity::{CollabType, EncodedCollab};
+use collab_folder::{Folder, FolderNotify};
+use collab_integrate::CollabKVDB;
+use flowy_error::{FlowyError, FlowyResult};
+use std::sync::{Arc, Weak};
+use tokio::task::spawn_blocking;
+use tracing::{event, info, Level};
 
 impl FolderManager {
   /// Called immediately after the application launched if the user already sign in/sign up.
@@ -30,9 +27,17 @@ impl FolderManager {
       workspace_id,
       initial_data
     );
-    *self.workspace_id.write() = Some(workspace_id.to_string());
-    let workspace_id = workspace_id.to_string();
 
+    if let Some(old_folder) = self.mutex_folder.swap(None) {
+      let old_folder = old_folder.read().await;
+      old_folder.close();
+      info!(
+        "remove old folder: {}",
+        old_folder.get_workspace_id().unwrap_or_default()
+      );
+    }
+
+    let workspace_id = workspace_id.to_string();
     // Get the collab db for the user with given user id.
     let collab_db = self.user.collab_db(uid)?;
 
@@ -47,60 +52,95 @@ impl FolderManager {
       FolderInitDataSource::LocalDisk {
         create_if_not_exist,
       } => {
-        let is_exist = is_exist_in_local_disk(&self.user, &workspace_id).unwrap_or(false);
+        let is_exist = self
+          .user
+          .is_folder_exist_on_disk(uid, &workspace_id)
+          .unwrap_or(false);
+        // 1. if the folder exists, open it from local disk
         if is_exist {
+          event!(Level::INFO, "Init folder from local disk");
           self
-            .open_local_folder(uid, &workspace_id, collab_db, folder_notifier)
+            .make_folder(uid, &workspace_id, collab_db, None, folder_notifier)
             .await?
         } else if create_if_not_exist {
+          // 2. if the folder doesn't exist and create_if_not_exist is true, create a default folder
           // Currently, this branch is only used when the server type is supabase. For appflowy cloud,
           // the default workspace is already created when the user sign up.
           self
             .create_default_folder(uid, &workspace_id, collab_db, folder_notifier)
             .await?
         } else {
-          return Err(FlowyError::new(
-            ErrorCode::RecordNotFound,
-            "Can't find any workspace data",
-          ));
+          // 3. If the folder doesn't exist and create_if_not_exist is false, try to fetch the folder data from cloud/
+          // This will happen user can't fetch the folder data when the user sign in.
+          let doc_state = self
+            .cloud_service
+            .get_folder_doc_state(&workspace_id, uid, CollabType::Folder, &workspace_id)
+            .await?;
+
+          self
+            .make_folder(
+              uid,
+              &workspace_id,
+              collab_db.clone(),
+              Some(DataSource::DocStateV1(doc_state)),
+              folder_notifier.clone(),
+            )
+            .await?
         }
       },
-      FolderInitDataSource::Cloud(raw_data) => {
-        if raw_data.is_empty() {
+      FolderInitDataSource::Cloud(doc_state) => {
+        if doc_state.is_empty() {
           event!(Level::ERROR, "remote folder data is empty, open from local");
           self
-            .open_local_folder(uid, &workspace_id, collab_db, folder_notifier)
+            .make_folder(uid, &workspace_id, collab_db, None, folder_notifier)
             .await?
         } else {
-          event!(Level::INFO, "Restore folder with remote data");
-          let collab = self
-            .collab_for_folder(uid, &workspace_id, collab_db.clone(), raw_data)
-            .await?;
-          Folder::open(UserId::from(uid), collab, Some(folder_notifier.clone()))?
+          event!(Level::INFO, "Restore folder from remote data");
+          self
+            .make_folder(
+              uid,
+              &workspace_id,
+              collab_db.clone(),
+              Some(DataSource::DocStateV1(doc_state)),
+              folder_notifier.clone(),
+            )
+            .await?
         }
-      },
-      FolderInitDataSource::FolderData(folder_data) => {
-        event!(Level::INFO, "Restore folder with passed-in folder data");
-        let collab = self
-          .collab_for_folder(uid, &workspace_id, collab_db, vec![])
-          .await?;
-        Folder::create(
-          UserId::from(uid),
-          collab,
-          Some(folder_notifier),
-          folder_data,
-        )
       },
     };
 
-    let folder_state_rx = folder.subscribe_sync_state();
-    *self.mutex_folder.lock() = Some(folder);
+    let folder_state_rx = {
+      let folder = folder.read().await;
+      let folder_state_rx = folder.subscribe_sync_state();
+      let index_content_rx = folder.subscribe_index_content();
+      self
+        .folder_indexer
+        .set_index_content_receiver(index_content_rx, workspace_id.clone());
+      self.handle_index_folder(workspace_id.clone(), &folder);
+      folder_state_rx
+    };
 
-    let weak_mutex_folder = Arc::downgrade(&self.mutex_folder);
-    subscribe_folder_sync_state_changed(workspace_id.clone(), folder_state_rx, &weak_mutex_folder);
-    subscribe_folder_snapshot_state_changed(workspace_id, &weak_mutex_folder);
-    subscribe_folder_trash_changed(section_change_rx, &weak_mutex_folder);
-    subscribe_folder_view_changed(view_rx, &weak_mutex_folder);
+    self.mutex_folder.store(Some(folder.clone()));
+
+    let weak_mutex_folder = Arc::downgrade(&folder);
+    subscribe_folder_sync_state_changed(
+      workspace_id.clone(),
+      folder_state_rx,
+      Arc::downgrade(&self.user),
+    );
+    subscribe_folder_trash_changed(
+      workspace_id.clone(),
+      section_change_rx,
+      weak_mutex_folder.clone(),
+      Arc::downgrade(&self.user),
+    );
+    subscribe_folder_view_changed(
+      workspace_id.clone(),
+      view_rx,
+      weak_mutex_folder.clone(),
+      Arc::downgrade(&self.user),
+    );
+
     Ok(())
   }
 
@@ -110,7 +150,7 @@ impl FolderManager {
     workspace_id: &str,
     collab_db: Weak<CollabKVDB>,
     folder_notifier: FolderNotify,
-  ) -> Result<Folder, FlowyError> {
+  ) -> Result<Arc<RwLock<Folder>>, FlowyError> {
     event!(
       Level::INFO,
       "Create folder:{} with default folder builder",
@@ -118,29 +158,67 @@ impl FolderManager {
     );
     let folder_data =
       DefaultFolderBuilder::build(uid, workspace_id.to_string(), &self.operation_handlers).await;
-    let collab = self
-      .collab_for_folder(uid, workspace_id, collab_db, vec![])
+    let folder = self
+      .create_folder_with_data(
+        uid,
+        workspace_id,
+        collab_db,
+        Some(folder_notifier),
+        Some(folder_data),
+      )
       .await?;
-    Ok(Folder::create(
-      UserId::from(uid),
-      collab,
-      Some(folder_notifier),
-      folder_data,
-    ))
+    Ok(folder)
   }
 
-  async fn open_local_folder(
-    &self,
-    uid: i64,
-    workspace_id: &str,
-    collab_db: Weak<CollabKVDB>,
-    folder_notifier: FolderNotify,
-  ) -> Result<Folder, FlowyError> {
-    event!(Level::INFO, "Init folder from local disk");
-    let collab = self
-      .collab_for_folder(uid, workspace_id, collab_db, vec![])
-      .await?;
-    let folder = Folder::open(UserId::from(uid), collab, Some(folder_notifier))?;
-    Ok(folder)
+  fn handle_index_folder(&self, workspace_id: String, folder: &Folder) {
+    let mut index_all = true;
+
+    let encoded_collab = self
+      .store_preferences
+      .get_object::<EncodedCollab>(&workspace_id);
+
+    if let Some(encoded_collab) = encoded_collab {
+      if let Ok(changes) = folder.calculate_view_changes(encoded_collab) {
+        let folder_indexer = self.folder_indexer.clone();
+
+        let views = folder.get_all_views();
+        let wid = workspace_id.clone();
+
+        if !changes.is_empty() && !views.is_empty() {
+          spawn_blocking(move || {
+            // We index the changes
+            folder_indexer.index_view_changes(views, changes, wid);
+          });
+          index_all = false;
+        }
+      }
+    }
+
+    if index_all {
+      let views = folder.get_all_views();
+      let folder_indexer = self.folder_indexer.clone();
+      let wid = workspace_id.clone();
+
+      // We spawn a blocking task to index all views in the folder
+      spawn_blocking(move || {
+        // We remove old indexes just in case
+        let _ = folder_indexer.remove_indices_for_workspace(wid.clone());
+
+        // We index all views from the workspace
+        folder_indexer.index_all_views(views, wid);
+      });
+    }
+
+    self.save_collab_to_preferences(folder);
+  }
+
+  fn save_collab_to_preferences(&self, folder: &Folder) {
+    if let Some(workspace_id) = folder.get_workspace_id() {
+      let encoded_collab = folder.encode_collab();
+
+      if let Ok(encoded) = encoded_collab {
+        let _ = self.store_preferences.set_object(&workspace_id, &encoded);
+      }
+    }
   }
 }
