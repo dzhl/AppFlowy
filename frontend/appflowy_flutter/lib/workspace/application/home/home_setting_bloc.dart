@@ -3,7 +3,6 @@ import 'package:appflowy/workspace/application/edit_panel/edit_context.dart';
 import 'package:appflowy/workspace/application/settings/appearance/appearance_cubit.dart';
 import 'package:appflowy_backend/protobuf/flowy-folder/workspace.pb.dart'
     show WorkspaceSettingPB;
-import 'package:dartz/dartz.dart';
 import 'package:flowy_infra/size.dart';
 import 'package:flowy_infra/time/duration.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -16,7 +15,7 @@ class HomeSettingBloc extends Bloc<HomeSettingEvent, HomeSettingState> {
     WorkspaceSettingPB workspaceSetting,
     AppearanceSettingsCubit appearanceSettingsCubit,
     double screenWidthPx,
-  )   : _listener = UserWorkspaceListener(),
+  )   : _listener = FolderListener(),
         _appearanceSettingsCubit = appearanceSettingsCubit,
         super(
           HomeSettingState.initial(
@@ -28,7 +27,7 @@ class HomeSettingBloc extends Bloc<HomeSettingEvent, HomeSettingState> {
     _dispatch();
   }
 
-  final UserWorkspaceListener _listener;
+  final FolderListener _listener;
   final AppearanceSettingsCubit _appearanceSettingsCubit;
 
   @override
@@ -43,10 +42,10 @@ class HomeSettingBloc extends Bloc<HomeSettingEvent, HomeSettingState> {
         await event.map(
           initial: (_Initial value) {},
           setEditPanel: (e) async {
-            emit(state.copyWith(panelContext: some(e.editContext)));
+            emit(state.copyWith(panelContext: e.editContext));
           },
           dismissEditPanel: (value) async {
-            emit(state.copyWith(panelContext: none()));
+            emit(state.copyWith(panelContext: null));
           },
           didReceiveWorkspaceSetting: (_DidReceiveWorkspaceSetting value) {
             emit(state.copyWith(workspaceSetting: value.setting));
@@ -87,7 +86,7 @@ class HomeSettingBloc extends Bloc<HomeSettingEvent, HomeSettingState> {
           },
           editPanelResized: (_EditPanelResized e) {
             final newPosition =
-                (e.offset + state.resizeStart).clamp(-50, 200).toDouble();
+                (state.resizeStart + e.offset).clamp(0, 200).toDouble();
             if (state.resizeOffset != newPosition) {
               emit(state.copyWith(resizeOffset: newPosition));
             }
@@ -139,7 +138,7 @@ class HomeSettingEvent with _$HomeSettingEvent {
 @freezed
 class HomeSettingState with _$HomeSettingState {
   const factory HomeSettingState({
-    required Option<EditPanelContext> panelContext,
+    required EditPanelContext? panelContext,
     required WorkspaceSettingPB workspaceSetting,
     required bool unauthorized,
     required bool isMenuCollapsed,
@@ -156,7 +155,7 @@ class HomeSettingState with _$HomeSettingState {
     double screenWidthPx,
   ) {
     return HomeSettingState(
-      panelContext: none(),
+      panelContext: null,
       workspaceSetting: workspaceSetting,
       unauthorized: false,
       isMenuCollapsed: appearanceSettingsState.isMenuCollapsed,

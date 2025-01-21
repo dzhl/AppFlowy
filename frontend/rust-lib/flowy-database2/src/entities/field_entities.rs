@@ -10,6 +10,8 @@ use strum_macros::{EnumCount as EnumCountMacro, EnumIter};
 
 use flowy_derive::{ProtoBuf, ProtoBuf_Enum};
 use flowy_error::ErrorCode;
+use lib_infra::validator_fn::required_not_empty_str;
+use validator::Validate;
 
 use crate::entities::parser::NotEmptyStr;
 use crate::entities::position_entities::OrderObjectPositionPB;
@@ -26,18 +28,15 @@ pub struct FieldPB {
   pub name: String,
 
   #[pb(index = 3)]
-  pub field_type: FieldType,
+  pub icon: String,
 
   #[pb(index = 4)]
-  pub visibility: bool,
+  pub field_type: FieldType,
 
   #[pb(index = 5)]
-  pub width: i32,
-
-  #[pb(index = 6)]
   pub is_primary: bool,
 
-  #[pb(index = 7)]
+  #[pb(index = 6)]
   pub type_option_data: Vec<u8>,
 }
 
@@ -46,13 +45,12 @@ impl FieldPB {
     let field_type = field.field_type.into();
     let type_option = field
       .get_any_type_option(field_type)
-      .unwrap_or_else(|| default_type_option_data_from_type(&field_type));
+      .unwrap_or_else(|| default_type_option_data_from_type(field_type));
     Self {
       id: field.id,
       name: field.name,
+      icon: field.icon,
       field_type,
-      visibility: field.visibility,
-      width: field.width as i32,
       is_primary: field.is_primary,
       type_option_data: type_option_to_pb(type_option, &field_type).to_vec(),
     }
@@ -159,12 +157,15 @@ pub struct CreateFieldPayloadPB {
   #[pb(index = 3, one_of)]
   pub field_name: Option<String>,
 
+  #[pb(index = 4, one_of)]
+  pub field_icon: Option<String>,
+
   /// If the type_option_data is not empty, it will be used to create the field.
   /// Otherwise, the default value will be used.
-  #[pb(index = 4, one_of)]
+  #[pb(index = 5, one_of)]
   pub type_option_data: Option<Vec<u8>>,
 
-  #[pb(index = 5)]
+  #[pb(index = 6)]
   pub field_position: OrderObjectPositionPB,
 }
 
@@ -214,12 +215,16 @@ pub struct UpdateFieldTypePayloadPB {
 
   #[pb(index = 3)]
   pub field_type: FieldType,
+
+  #[pb(index = 4, one_of)]
+  pub field_name: Option<String>,
 }
 
 pub struct EditFieldParams {
   pub view_id: String,
   pub field_id: String,
   pub field_type: FieldType,
+  pub field_name: Option<String>,
 }
 
 impl TryInto<EditFieldParams> for UpdateFieldTypePayloadPB {
@@ -232,6 +237,7 @@ impl TryInto<EditFieldParams> for UpdateFieldTypePayloadPB {
       view_id: view_id.0,
       field_id: field_id.0,
       field_type: self.field_type,
+      field_name: self.field_name,
     })
   }
 }
@@ -371,72 +377,29 @@ impl TryInto<GetFieldParams> for GetFieldPayloadPB {
 /// Pass in None if you don't want to modify a property
 /// Pass in Some(Value) if you want to modify a property
 ///
-#[derive(Debug, Clone, Default, ProtoBuf)]
+#[derive(Debug, Clone, Default, ProtoBuf, Validate)]
 pub struct FieldChangesetPB {
   #[pb(index = 1)]
+  #[validate(custom(function = "required_not_empty_str"))]
   pub field_id: String,
 
   #[pb(index = 2)]
+  #[validate(custom(function = "required_not_empty_str"))]
   pub view_id: String,
 
   #[pb(index = 3, one_of)]
   pub name: Option<String>,
 
   #[pb(index = 4, one_of)]
-  pub desc: Option<String>,
+  pub icon: Option<String>,
 
   #[pb(index = 5, one_of)]
-  pub frozen: Option<bool>,
-
-  #[pb(index = 6, one_of)]
-  pub visibility: Option<bool>,
-
-  #[pb(index = 7, one_of)]
-  pub width: Option<i32>,
-}
-
-impl TryInto<FieldChangesetParams> for FieldChangesetPB {
-  type Error = ErrorCode;
-
-  fn try_into(self) -> Result<FieldChangesetParams, Self::Error> {
-    let view_id = NotEmptyStr::parse(self.view_id).map_err(|_| ErrorCode::DatabaseIdIsEmpty)?;
-    let field_id = NotEmptyStr::parse(self.field_id).map_err(|_| ErrorCode::FieldIdIsEmpty)?;
-    // if let Some(type_option_data) = self.type_option_data.as_ref() {
-    //     if type_option_data.is_empty() {
-    //         return Err(ErrorCode::TypeOptionDataIsEmpty);
-    //     }
-    // }
-
-    Ok(FieldChangesetParams {
-      field_id: field_id.0,
-      view_id: view_id.0,
-      name: self.name,
-      desc: self.desc,
-      frozen: self.frozen,
-      visibility: self.visibility,
-      width: self.width,
-      // type_option_data: self.type_option_data,
-    })
-  }
-}
-
-#[derive(Debug, Clone, Default)]
-pub struct FieldChangesetParams {
-  pub field_id: String,
-
-  pub view_id: String,
-
-  pub name: Option<String>,
-
   pub desc: Option<String>,
 
+  #[pb(index = 6, one_of)]
   pub frozen: Option<bool>,
-
-  pub visibility: Option<bool>,
-
-  pub width: Option<i32>,
-  // pub type_option_data: Option<Vec<u8>>,
 }
+
 /// Certain field types have user-defined options such as color, date format, number format,
 /// or a list of values for a multi-select list. These options are defined within a specialization
 /// of the FieldTypeOption class.
@@ -473,6 +436,11 @@ pub enum FieldType {
   Checklist = 7,
   LastEditedTime = 8,
   CreatedTime = 9,
+  Relation = 10,
+  Summary = 11,
+  Translate = 12,
+  Time = 13,
+  Media = 14,
 }
 
 impl Display for FieldType {
@@ -509,10 +477,19 @@ impl FieldType {
       FieldType::Checkbox => "Checkbox",
       FieldType::URL => "URL",
       FieldType::Checklist => "Checklist",
-      FieldType::LastEditedTime => "Last edited time",
+      FieldType::LastEditedTime => "Last modified",
       FieldType::CreatedTime => "Created time",
+      FieldType::Relation => "Relation",
+      FieldType::Summary => "Summarize",
+      FieldType::Translate => "Translate",
+      FieldType::Time => "Time",
+      FieldType::Media => "Media",
     };
     s.to_string()
+  }
+
+  pub fn is_ai_field(&self) -> bool {
+    matches!(self, FieldType::Summary | FieldType::Translate)
   }
 
   pub fn is_number(&self) -> bool {
@@ -559,6 +536,18 @@ impl FieldType {
     matches!(self, FieldType::Checklist)
   }
 
+  pub fn is_relation(&self) -> bool {
+    matches!(self, FieldType::Relation)
+  }
+
+  pub fn is_time(&self) -> bool {
+    matches!(self, FieldType::Time)
+  }
+
+  pub fn is_media(&self) -> bool {
+    matches!(self, FieldType::Media)
+  }
+
   pub fn can_be_group(&self) -> bool {
     self.is_select_option() || self.is_checkbox() || self.is_url()
   }
@@ -602,6 +591,30 @@ pub struct DuplicateFieldPayloadPB {
 // }
 
 impl TryInto<FieldIdParams> for DuplicateFieldPayloadPB {
+  type Error = ErrorCode;
+
+  fn try_into(self) -> Result<FieldIdParams, Self::Error> {
+    let view_id = NotEmptyStr::parse(self.view_id).map_err(|_| ErrorCode::DatabaseIdIsEmpty)?;
+    let field_id = NotEmptyStr::parse(self.field_id).map_err(|_| ErrorCode::FieldIdIsEmpty)?;
+    Ok(FieldIdParams {
+      view_id: view_id.0,
+      field_id: field_id.0,
+    })
+  }
+}
+
+#[derive(Debug, Clone, Default, ProtoBuf, Validate)]
+pub struct ClearFieldPayloadPB {
+  #[pb(index = 1)]
+  #[validate(custom(function = "required_not_empty_str"))]
+  pub field_id: String,
+
+  #[pb(index = 2)]
+  #[validate(custom(function = "required_not_empty_str"))]
+  pub view_id: String,
+}
+
+impl TryInto<FieldIdParams> for ClearFieldPayloadPB {
   type Error = ErrorCode;
 
   fn try_into(self) -> Result<FieldIdParams, Self::Error> {

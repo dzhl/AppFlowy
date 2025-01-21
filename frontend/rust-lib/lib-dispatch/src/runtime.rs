@@ -7,17 +7,15 @@ use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
 
 pub struct AFPluginRuntime {
-  inner: Runtime,
-  #[cfg(target_arch = "wasm32")]
-  local: tokio::task::LocalSet,
+  pub(crate) inner: Runtime,
 }
 
 impl Display for AFPluginRuntime {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-    if cfg!(target_arch = "wasm32") {
-      write!(f, "Runtime(single_thread)")
+    if cfg!(any(target_arch = "wasm32", feature = "local_set")) {
+      write!(f, "Runtime(local_set)")
     } else {
-      write!(f, "Runtime(multi_thread)")
+      write!(f, "Runtime")
     }
   }
 }
@@ -25,23 +23,9 @@ impl Display for AFPluginRuntime {
 impl AFPluginRuntime {
   pub fn new() -> io::Result<Self> {
     let inner = default_tokio_runtime()?;
-    Ok(Self {
-      inner,
-      #[cfg(target_arch = "wasm32")]
-      local: tokio::task::LocalSet::new(),
-    })
+    Ok(Self { inner })
   }
 
-  #[cfg(target_arch = "wasm32")]
-  #[track_caller]
-  pub fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
-  where
-    F: Future + 'static,
-  {
-    self.local.spawn_local(future)
-  }
-
-  #[cfg(not(target_arch = "wasm32"))]
   #[track_caller]
   pub fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
   where
@@ -51,32 +35,6 @@ impl AFPluginRuntime {
     self.inner.spawn(future)
   }
 
-  #[cfg(target_arch = "wasm32")]
-  pub async fn run_until<F>(&self, future: F) -> F::Output
-  where
-    F: Future,
-  {
-    self.local.run_until(future).await
-  }
-
-  #[cfg(not(target_arch = "wasm32"))]
-  pub async fn run_until<F>(&self, future: F) -> F::Output
-  where
-    F: Future,
-  {
-    future.await
-  }
-
-  #[cfg(target_arch = "wasm32")]
-  #[track_caller]
-  pub fn block_on<F>(&self, f: F) -> F::Output
-  where
-    F: Future,
-  {
-    self.local.block_on(&self.inner, f)
-  }
-
-  #[cfg(not(target_arch = "wasm32"))]
   #[track_caller]
   pub fn block_on<F>(&self, f: F) -> F::Output
   where
@@ -86,14 +44,16 @@ impl AFPluginRuntime {
   }
 }
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(feature = "local_set")]
 pub fn default_tokio_runtime() -> io::Result<Runtime> {
-  runtime::Builder::new_current_thread()
+  runtime::Builder::new_multi_thread()
+    .enable_io()
+    .enable_time()
     .thread_name("dispatch-rt-st")
     .build()
 }
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(feature = "local_set"))]
 pub fn default_tokio_runtime() -> io::Result<Runtime> {
   runtime::Builder::new_multi_thread()
     .thread_name("dispatch-rt-mt")

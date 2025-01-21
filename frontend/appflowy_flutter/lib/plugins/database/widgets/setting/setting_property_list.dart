@@ -5,17 +5,15 @@ import 'package:appflowy/plugins/database/application/field/field_controller.dar
 import 'package:appflowy/plugins/database/application/field/field_info.dart';
 import 'package:appflowy/plugins/database/application/setting/property_bloc.dart';
 import 'package:appflowy/plugins/database/grid/presentation/layout/sizes.dart';
-import 'package:appflowy/plugins/database/grid/presentation/widgets/header/field_editor.dart';
+import 'package:appflowy/plugins/database/grid/presentation/widgets/header/desktop_field_cell.dart';
+import 'package:appflowy/plugins/database/widgets/field/field_editor.dart';
 import 'package:appflowy/plugins/database/widgets/setting/field_visibility_extension.dart';
-import 'package:appflowy/util/field_type_extension.dart';
 import 'package:appflowy_backend/protobuf/flowy-database2/protobuf.dart';
-import 'package:appflowy_popover/appflowy_popover.dart';
 import 'package:collection/collection.dart';
 import 'package:flowy_infra/theme_extension.dart';
 import 'package:flowy_infra_ui/flowy_infra_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:styled_widget/styled_widget.dart';
 
 class DatabasePropertyList extends StatefulWidget {
   const DatabasePropertyList({
@@ -42,6 +40,12 @@ class _DatabasePropertyListState extends State<DatabasePropertyList> {
       viewId: widget.viewId,
       fieldController: widget.fieldController,
     )..add(const DatabasePropertyEvent.initial());
+  }
+
+  @override
+  void dispose() {
+    _popoverMutex.dispose();
+    super.dispose();
   }
 
   @override
@@ -86,7 +90,7 @@ class _DatabasePropertyListState extends State<DatabasePropertyList> {
                   .add(DatabasePropertyEvent.moveField(from, to));
             },
             onReorderStart: (_) => _popoverMutex.close(),
-            padding: const EdgeInsets.symmetric(vertical: 6.0),
+            padding: const EdgeInsets.symmetric(vertical: 4.0),
             children: cells,
           );
         },
@@ -138,11 +142,13 @@ class _DatabasePropertyCellState extends State<DatabasePropertyCell> {
       constraints: BoxConstraints.loose(const Size(240, 400)),
       triggerActions: PopoverTriggerFlags.none,
       margin: EdgeInsets.zero,
-      child: SizedBox(
+      child: Container(
         height: GridSize.popoverItemHeight,
+        margin: const EdgeInsets.symmetric(vertical: 2, horizontal: 6),
         child: FlowyButton(
           hoverColor: AFThemeExtension.of(context).lightGreyHover,
-          text: FlowyText.medium(
+          text: FlowyText(
+            lineHeight: 1.0,
             widget.fieldInfo.name,
             color: AFThemeExtension.of(context).textColor,
           ),
@@ -166,9 +172,8 @@ class _DatabasePropertyCellState extends State<DatabasePropertyCell> {
                 ),
               ),
               const HSpace(6.0),
-              FlowySvg(
-                widget.fieldInfo.fieldType.svgData,
-                color: Theme.of(context).iconTheme.color,
+              FieldIcon(
+                fieldInfo: widget.fieldInfo,
               ),
             ],
           ),
@@ -179,8 +184,7 @@ class _DatabasePropertyCellState extends State<DatabasePropertyCell> {
                 return;
               }
 
-              final newVisiblity =
-                  widget.fieldInfo.fieldSettings!.visibility.toggle();
+              final newVisiblity = widget.fieldInfo.visibility!.toggle();
               context.read<DatabasePropertyBloc>().add(
                     DatabasePropertyEvent.setFieldVisibility(
                       widget.fieldInfo.id,
@@ -191,13 +195,14 @@ class _DatabasePropertyCellState extends State<DatabasePropertyCell> {
             icon: visibleIcon,
           ),
           onTap: () => _popoverController.show(),
-        ).padding(horizontal: 6.0),
+        ),
       ),
       popupBuilder: (BuildContext context) {
         return FieldEditor(
           viewId: widget.viewId,
-          field: widget.fieldInfo.field,
+          fieldInfo: widget.fieldInfo,
           fieldController: widget.fieldController,
+          isNewField: false,
         );
       },
     );

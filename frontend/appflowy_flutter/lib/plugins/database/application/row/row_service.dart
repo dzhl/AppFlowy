@@ -1,7 +1,7 @@
-import 'package:appflowy_backend/protobuf/flowy-database2/protobuf.dart';
-import 'package:dartz/dartz.dart';
 import 'package:appflowy_backend/dispatch/dispatch.dart';
+import 'package:appflowy_backend/protobuf/flowy-database2/protobuf.dart';
 import 'package:appflowy_backend/protobuf/flowy-error/errors.pb.dart';
+import 'package:appflowy_result/appflowy_result.dart';
 
 import '../field/field_info.dart';
 
@@ -12,7 +12,7 @@ class RowBackendService {
 
   final String viewId;
 
-  static Future<Either<RowMetaPB, FlowyError>> createRow({
+  static Future<FlowyResult<RowMetaPB, FlowyError>> createRow({
     required String viewId,
     String? groupId,
     void Function(RowDataBuilder builder)? withCells,
@@ -28,22 +28,24 @@ class RowBackendService {
       ),
     );
 
-    Map<String, String>? cellDataByFieldId;
-
     if (withCells != null) {
       final rowBuilder = RowDataBuilder();
       withCells(rowBuilder);
-      cellDataByFieldId = rowBuilder.build();
-    }
-
-    if (cellDataByFieldId != null) {
-      payload.data = RowDataPB(cellDataByFieldId: cellDataByFieldId);
+      payload.data.addAll(rowBuilder.build());
     }
 
     return DatabaseEventCreateRow(payload).send();
   }
 
-  Future<Either<RowMetaPB, FlowyError>> createRowBefore(RowId rowId) {
+  Future<FlowyResult<void, FlowyError>> initRow(RowId rowId) async {
+    final payload = DatabaseViewRowIdPB()
+      ..viewId = viewId
+      ..rowId = rowId;
+
+    return DatabaseEventInitRow(payload).send();
+  }
+
+  Future<FlowyResult<RowMetaPB, FlowyError>> createRowBefore(RowId rowId) {
     return createRow(
       viewId: viewId,
       position: OrderObjectPositionTypePB.Before,
@@ -51,7 +53,7 @@ class RowBackendService {
     );
   }
 
-  Future<Either<RowMetaPB, FlowyError>> createRowAfter(RowId rowId) {
+  Future<FlowyResult<RowMetaPB, FlowyError>> createRowAfter(RowId rowId) {
     return createRow(
       viewId: viewId,
       position: OrderObjectPositionTypePB.After,
@@ -59,29 +61,29 @@ class RowBackendService {
     );
   }
 
-  static Future<Either<RowMetaPB, FlowyError>> getRow({
+  static Future<FlowyResult<RowMetaPB, FlowyError>> getRow({
     required String viewId,
     required String rowId,
   }) {
-    final payload = RowIdPB()
+    final payload = DatabaseViewRowIdPB()
       ..viewId = viewId
       ..rowId = rowId;
 
     return DatabaseEventGetRowMeta(payload).send();
   }
 
-  Future<Either<RowMetaPB, FlowyError>> getRowMeta(RowId rowId) {
-    final payload = RowIdPB.create()
+  Future<FlowyResult<RowMetaPB, FlowyError>> getRowMeta(RowId rowId) {
+    final payload = DatabaseViewRowIdPB.create()
       ..viewId = viewId
       ..rowId = rowId;
 
     return DatabaseEventGetRowMeta(payload).send();
   }
 
-  Future<Either<Unit, FlowyError>> updateMeta({
+  Future<FlowyResult<void, FlowyError>> updateMeta({
     required String rowId,
     String? iconURL,
-    String? coverURL,
+    RowCoverPB? cover,
     bool? isDocumentEmpty,
   }) {
     final payload = UpdateRowMetaChangesetPB.create()
@@ -91,8 +93,8 @@ class RowBackendService {
     if (iconURL != null) {
       payload.iconUrl = iconURL;
     }
-    if (coverURL != null) {
-      payload.coverUrl = coverURL;
+    if (cover != null) {
+      payload.cover = cover;
     }
 
     if (isDocumentEmpty != null) {
@@ -102,22 +104,30 @@ class RowBackendService {
     return DatabaseEventUpdateRowMeta(payload).send();
   }
 
-  static Future<Either<Unit, FlowyError>> deleteRow(
-    String viewId,
-    RowId rowId,
-  ) {
-    final payload = RowIdPB.create()
+  Future<FlowyResult<void, FlowyError>> removeCover(String rowId) async {
+    final payload = RemoveCoverPayloadPB.create()
       ..viewId = viewId
       ..rowId = rowId;
 
-    return DatabaseEventDeleteRow(payload).send();
+    return DatabaseEventRemoveCover(payload).send();
   }
 
-  static Future<Either<Unit, FlowyError>> duplicateRow(
+  static Future<FlowyResult<void, FlowyError>> deleteRows(
+    String viewId,
+    List<RowId> rowIds,
+  ) {
+    final payload = RepeatedRowIdPB.create()
+      ..viewId = viewId
+      ..rowIds.addAll(rowIds);
+
+    return DatabaseEventDeleteRows(payload).send();
+  }
+
+  static Future<FlowyResult<void, FlowyError>> duplicateRow(
     String viewId,
     RowId rowId,
   ) {
-    final payload = RowIdPB(
+    final payload = DatabaseViewRowIdPB(
       viewId: viewId,
       rowId: rowId,
     );

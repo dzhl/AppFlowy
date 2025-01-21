@@ -6,7 +6,7 @@ import 'cell_data_loader.dart';
 import 'cell_data_persistence.dart';
 
 typedef TextCellController = CellController<String, String>;
-typedef CheckboxCellController = CellController<String, String>;
+typedef CheckboxCellController = CellController<CheckboxCellDataPB, String>;
 typedef NumberCellController = CellController<String, String>;
 typedef SelectOptionCellController
     = CellController<SelectOptionCellDataPB, String>;
@@ -14,6 +14,11 @@ typedef ChecklistCellController = CellController<ChecklistCellDataPB, String>;
 typedef DateCellController = CellController<DateCellDataPB, String>;
 typedef TimestampCellController = CellController<TimestampCellDataPB, String>;
 typedef URLCellController = CellController<URLCellDataPB, String>;
+typedef RelationCellController = CellController<RelationCellDataPB, String>;
+typedef SummaryCellController = CellController<String, String>;
+typedef TimeCellController = CellController<TimeCellDataPB, String>;
+typedef TranslateCellController = CellController<String, String>;
+typedef MediaCellController = CellController<MediaCellDataPB, String>;
 
 CellController makeCellController(
   DatabaseController databaseController,
@@ -24,13 +29,13 @@ CellController makeCellController(
   final fieldType = fieldController.getField(cellContext.fieldId)!.fieldType;
   switch (fieldType) {
     case FieldType.Checkbox:
-      return TextCellController(
+      return CheckboxCellController(
         viewId: viewId,
         fieldController: fieldController,
         cellContext: cellContext,
         rowCache: rowCache,
         cellDataLoader: CellDataLoader(
-          parser: StringCellDataParser(),
+          parser: CheckboxCellDataParser(),
         ),
         cellDataPersistence: TextCellDataPersistence(),
       );
@@ -115,6 +120,66 @@ CellController makeCellController(
         rowCache: rowCache,
         cellDataLoader: CellDataLoader(
           parser: URLCellDataParser(),
+        ),
+        cellDataPersistence: TextCellDataPersistence(),
+      );
+    case FieldType.Relation:
+      return RelationCellController(
+        viewId: viewId,
+        fieldController: fieldController,
+        cellContext: cellContext,
+        rowCache: rowCache,
+        cellDataLoader: CellDataLoader(
+          parser: RelationCellDataParser(),
+          reloadOnFieldChange: true,
+        ),
+        cellDataPersistence: TextCellDataPersistence(),
+      );
+    case FieldType.Summary:
+      return SummaryCellController(
+        viewId: viewId,
+        fieldController: fieldController,
+        cellContext: cellContext,
+        rowCache: rowCache,
+        cellDataLoader: CellDataLoader(
+          parser: StringCellDataParser(),
+          reloadOnFieldChange: true,
+        ),
+        cellDataPersistence: TextCellDataPersistence(),
+      );
+    case FieldType.Time:
+      return TimeCellController(
+        viewId: viewId,
+        fieldController: fieldController,
+        cellContext: cellContext,
+        rowCache: rowCache,
+        cellDataLoader: CellDataLoader(
+          parser: TimeCellDataParser(),
+          reloadOnFieldChange: true,
+        ),
+        cellDataPersistence: TextCellDataPersistence(),
+      );
+    case FieldType.Translate:
+      return TranslateCellController(
+        viewId: viewId,
+        fieldController: fieldController,
+        cellContext: cellContext,
+        rowCache: rowCache,
+        cellDataLoader: CellDataLoader(
+          parser: StringCellDataParser(),
+          reloadOnFieldChange: true,
+        ),
+        cellDataPersistence: TextCellDataPersistence(),
+      );
+    case FieldType.Media:
+      return MediaCellController(
+        viewId: viewId,
+        fieldController: fieldController,
+        cellContext: cellContext,
+        rowCache: rowCache,
+        cellDataLoader: CellDataLoader(
+          parser: MediaCellDataParser(),
+          reloadOnFieldChange: true,
         ),
         cellDataPersistence: TextCellDataPersistence(),
       );

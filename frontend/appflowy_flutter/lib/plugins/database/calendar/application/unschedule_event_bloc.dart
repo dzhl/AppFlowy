@@ -5,7 +5,6 @@ import 'package:appflowy/plugins/database/application/row/row_service.dart';
 import 'package:appflowy_backend/dispatch/dispatch.dart';
 import 'package:appflowy_backend/log.dart';
 import 'package:appflowy_backend/protobuf/flowy-database2/protobuf.dart';
-import 'package:dartz/dartz.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
@@ -30,6 +29,15 @@ class UnscheduleEventsBloc
   CellMemCache get cellCache => databaseController.rowCache.cellCache;
   RowCache get rowCache => databaseController.rowCache;
 
+  DatabaseCallbacks? _databaseCallbacks;
+
+  @override
+  Future<void> close() async {
+    databaseController.removeListener(onDatabaseChanged: _databaseCallbacks);
+    _databaseCallbacks = null;
+    await super.close();
+  }
+
   void _dispatch() {
     on<UnscheduleEventsEvent>(
       (event, emit) async {
@@ -43,7 +51,7 @@ class UnscheduleEventsBloc
               state.copyWith(
                 allEvents: events,
                 unscheduleEvents:
-                    events.where((element) => !element.isScheduled).toList(),
+                    events.where((element) => !element.hasTimestamp()).toList(),
               ),
             );
           },
@@ -56,7 +64,7 @@ class UnscheduleEventsBloc
               state.copyWith(
                 allEvents: events,
                 unscheduleEvents:
-                    events.where((element) => !element.isScheduled).toList(),
+                    events.where((element) => !element.hasTimestamp()).toList(),
               ),
             );
           },
@@ -66,7 +74,7 @@ class UnscheduleEventsBloc
               state.copyWith(
                 allEvents: events,
                 unscheduleEvents:
-                    events.where((element) => !element.isScheduled).toList(),
+                    events.where((element) => !element.hasTimestamp()).toList(),
               ),
             );
           },
@@ -78,7 +86,7 @@ class UnscheduleEventsBloc
   Future<CalendarEventPB?> _loadEvent(
     RowId rowId,
   ) async {
-    final payload = RowIdPB(viewId: viewId, rowId: rowId);
+    final payload = DatabaseViewRowIdPB(viewId: viewId, rowId: rowId);
     return DatabaseEventGetCalendarEvent(payload).send().then(
           (result) => result.fold(
             (eventPB) => eventPB,
@@ -104,13 +112,13 @@ class UnscheduleEventsBloc
   }
 
   void _startListening() {
-    final onDatabaseChanged = DatabaseCallbacks(
-      onRowsCreated: (rowIds) async {
+    _databaseCallbacks = DatabaseCallbacks(
+      onRowsCreated: (rows) async {
         if (isClosed) {
           return;
         }
-        for (final id in rowIds) {
-          final event = await _loadEvent(id);
+        for (final row in rows) {
+          final event = await _loadEvent(row.rowMeta.id);
           if (event != null && !isClosed) {
             add(UnscheduleEventsEvent.didReceiveEvent(event));
           }
@@ -136,7 +144,7 @@ class UnscheduleEventsBloc
       },
     );
 
-    databaseController.addListener(onDatabaseChanged: onDatabaseChanged);
+    databaseController.addListener(onDatabaseChanged: _databaseCallbacks);
   }
 }
 
@@ -160,13 +168,13 @@ class UnscheduleEventsEvent with _$UnscheduleEventsEvent {
 @freezed
 class UnscheduleEventsState with _$UnscheduleEventsState {
   const factory UnscheduleEventsState({
-    required Option<DatabasePB> database,
+    required DatabasePB? database,
     required List<CalendarEventPB> allEvents,
     required List<CalendarEventPB> unscheduleEvents,
   }) = _UnscheduleEventsState;
 
-  factory UnscheduleEventsState.initial() => UnscheduleEventsState(
-        database: none(),
+  factory UnscheduleEventsState.initial() => const UnscheduleEventsState(
+        database: null,
         allEvents: [],
         unscheduleEvents: [],
       );

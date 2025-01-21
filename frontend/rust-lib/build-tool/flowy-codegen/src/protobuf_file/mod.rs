@@ -12,8 +12,9 @@ use itertools::Itertools;
 use log::info;
 pub use proto_gen::*;
 pub use proto_info::*;
+use std::fs;
 use std::fs::File;
-use std::io::Write;
+use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use walkdir::WalkDir;
@@ -76,7 +77,7 @@ pub fn dart_gen(crate_name: &str) {
 }
 
 #[allow(unused_variables)]
-pub fn ts_gen(crate_name: &str, project: Project) {
+pub fn ts_gen(crate_name: &str, dest_folder_name: &str, project: Project) {
   // 1. generate the proto files to proto_file_dir
   #[cfg(feature = "proto_gen")]
   let proto_crates = gen_proto_files(crate_name);
@@ -116,7 +117,7 @@ pub fn ts_gen(crate_name: &str, project: Project) {
     // 2. generate the protobuf files(Dart)
     #[cfg(feature = "ts")]
     generate_ts_protobuf_files(
-      crate_name,
+      dest_folder_name,
       &proto_file_output_path,
       &proto_file_paths,
       &file_names,
@@ -147,6 +148,38 @@ fn generate_rust_protobuf_files(
     .include(proto_file_output_path)
     .run()
     .expect("Running rust protoc failed.");
+  remove_box_pointers_lint_from_all_except_mod(protobuf_output_path);
+}
+fn remove_box_pointers_lint_from_all_except_mod(dir_path: &str) {
+  let dir = fs::read_dir(dir_path).expect("Failed to read directory");
+  for entry in dir {
+    let entry = entry.expect("Failed to read directory entry");
+    let path = entry.path();
+
+    // Skip directories and mod.rs
+    if path.is_file() {
+      if let Some(file_name) = path.file_name().and_then(|f| f.to_str()) {
+        if file_name != "mod.rs" {
+          remove_box_pointers_lint(&path);
+        }
+      }
+    }
+  }
+}
+
+fn remove_box_pointers_lint(file_path: &Path) {
+  let file = File::open(file_path).expect("Failed to open file");
+  let reader = BufReader::new(file);
+  let lines: Vec<String> = reader
+    .lines()
+    .map_while(Result::ok)
+    .filter(|line| !line.contains("#![allow(box_pointers)]"))
+    .collect();
+
+  let mut file = File::create(file_path).expect("Failed to create file");
+  for line in lines {
+    writeln!(file, "{}", line).expect("Failed to write line");
+  }
 }
 
 #[cfg(feature = "ts")]
@@ -197,7 +230,7 @@ fn generate_ts_protobuf_files(
     .write(true)
     .append(false)
     .truncate(true)
-    .open(&ts_index)
+    .open(ts_index)
   {
     Ok(ref mut file) => {
       let mut export = String::new();

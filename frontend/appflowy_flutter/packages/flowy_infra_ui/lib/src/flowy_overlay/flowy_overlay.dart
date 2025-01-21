@@ -2,9 +2,10 @@
 
 import 'dart:ui';
 
-import 'package:flowy_infra_ui/src/flowy_overlay/layout.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+
+import 'package:flowy_infra_ui/src/flowy_overlay/layout.dart';
 
 /// Specifies how overlay are anchored to the SourceWidget
 enum AnchorDirection {
@@ -78,7 +79,7 @@ abstract mixin class FlowyOverlayDelegate {
 }
 
 class FlowyOverlay extends StatefulWidget {
-  const FlowyOverlay({Key? key, required this.child}) : super(key: key);
+  const FlowyOverlay({super.key, required this.child});
 
   final Widget child;
 
@@ -292,7 +293,7 @@ class FlowyOverlayState extends State<FlowyOverlay> {
         RenderObject renderObject = anchorContext.findRenderObject()!;
         assert(
           renderObject is RenderBox,
-          'Unexpected non-RenderBox render object caught.',
+          'Unexpecteded non-RenderBox render object caught.',
         );
         final renderBox = renderObject as RenderBox;
         targetAnchorPosition = renderBox.localToGlobal(Offset.zero);
@@ -341,18 +342,17 @@ class FlowyOverlayState extends State<FlowyOverlay> {
 
   @override
   void initState() {
-    _keyboardShortcutBindings.addAll({
-      LogicalKeySet(LogicalKeyboardKey.escape): (identifier) {
-        remove(identifier);
-      },
-    });
     super.initState();
+    _keyboardShortcutBindings.addAll({
+      LogicalKeySet(LogicalKeyboardKey.escape): (identifier) =>
+          remove(identifier),
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final overlays = _overlayList.map((item) {
-      var widget = item.widget;
+      Widget widget = item.widget;
 
       // requestFocus will cause the children weird focus behaviors.
       // item.focusNode.requestFocus();
@@ -390,15 +390,11 @@ class FlowyOverlayState extends State<FlowyOverlay> {
     return MaterialApp(
       theme: Theme.of(context),
       debugShowCheckedModeBanner: false,
-      home: Stack(
-        children: children..addAll(overlays),
-      ),
+      home: Stack(children: children..addAll(overlays)),
     );
   }
 
-  void _handleTapOnBackground() {
-    removeAll();
-  }
+  void _handleTapOnBackground() => removeAll();
 
   Widget? _renderBackground(List<Widget> overlays) {
     Widget? child;

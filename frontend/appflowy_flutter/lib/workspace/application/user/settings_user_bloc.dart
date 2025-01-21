@@ -3,7 +3,7 @@ import 'package:appflowy/user/application/user_service.dart';
 import 'package:appflowy_backend/log.dart';
 import 'package:appflowy_backend/protobuf/flowy-error/errors.pb.dart';
 import 'package:appflowy_backend/protobuf/flowy-user/user_profile.pb.dart';
-import 'package:dartz/dartz.dart';
+import 'package:appflowy_result/appflowy_result.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
@@ -63,24 +63,6 @@ class SettingsUserViewBloc extends Bloc<SettingsUserEvent, SettingsUserState> {
               );
             });
           },
-          updateUserOpenAIKey: (openAIKey) {
-            _userService.updateUserProfile(openAIKey: openAIKey).then((result) {
-              result.fold(
-                (l) => null,
-                (err) => Log.error(err),
-              );
-            });
-          },
-          updateUserStabilityAIKey: (stabilityAIKey) {
-            _userService
-                .updateUserProfile(stabilityAiKey: stabilityAIKey)
-                .then((result) {
-              result.fold(
-                (l) => null,
-                (err) => Log.error(err),
-              );
-            });
-          },
           updateUserEmail: (String email) {
             _userService.updateUserProfile(email: email).then((result) {
               result.fold(
@@ -101,22 +83,22 @@ class SettingsUserViewBloc extends Bloc<SettingsUserEvent, SettingsUserState> {
       }
 
       result.fold(
-        (err) => Log.error(err),
         (userProfile) => add(
           SettingsUserEvent.didReceiveUserProfile(userProfile),
         ),
+        (err) => Log.error(err),
       );
     });
   }
 
-  void _profileUpdated(Either<UserProfilePB, FlowyError> userProfileOrFailed) {
-    userProfileOrFailed.fold(
-      (newUserProfile) {
-        add(SettingsUserEvent.didReceiveUserProfile(newUserProfile));
-      },
-      (err) => Log.error(err),
-    );
-  }
+  void _profileUpdated(
+    FlowyResult<UserProfilePB, FlowyError> userProfileOrFailed,
+  ) =>
+      userProfileOrFailed.fold(
+        (newUserProfile) =>
+            add(SettingsUserEvent.didReceiveUserProfile(newUserProfile)),
+        (err) => Log.error(err),
+      );
 }
 
 @freezed
@@ -127,11 +109,6 @@ class SettingsUserEvent with _$SettingsUserEvent {
   const factory SettingsUserEvent.updateUserIcon({required String iconUrl}) =
       _UpdateUserIcon;
   const factory SettingsUserEvent.removeUserIcon() = _RemoveUserIcon;
-  const factory SettingsUserEvent.updateUserOpenAIKey(String openAIKey) =
-      _UpdateUserOpenaiKey;
-  const factory SettingsUserEvent.updateUserStabilityAIKey(
-    String stabilityAIKey,
-  ) = _UpdateUserStabilityAIKey;
   const factory SettingsUserEvent.didReceiveUserProfile(
     UserProfilePB newUserProfile,
   ) = _DidReceiveUserProfile;
@@ -141,12 +118,12 @@ class SettingsUserEvent with _$SettingsUserEvent {
 class SettingsUserState with _$SettingsUserState {
   const factory SettingsUserState({
     required UserProfilePB userProfile,
-    required Either<Unit, String> successOrFailure,
+    required FlowyResult<void, String> successOrFailure,
   }) = _SettingsUserState;
 
   factory SettingsUserState.initial(UserProfilePB userProfile) =>
       SettingsUserState(
         userProfile: userProfile,
-        successOrFailure: left(unit),
+        successOrFailure: FlowyResult.success(null),
       );
 }

@@ -1,6 +1,8 @@
 import 'package:appflowy/generated/flowy_svgs.g.dart';
 import 'package:appflowy/generated/locale_keys.g.dart';
-import 'package:appflowy/workspace/presentation/home/toast.dart';
+import 'package:appflowy/plugins/document/presentation/editor_plugins/block_menu/block_menu_button.dart';
+import 'package:appflowy/plugins/document/presentation/editor_plugins/link_preview/shared.dart';
+import 'package:appflowy/workspace/presentation/widgets/dialogs.dart';
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:appflowy_editor_plugins/appflowy_editor_plugins.dart';
 import 'package:easy_localization/easy_localization.dart';
@@ -8,6 +10,8 @@ import 'package:flowy_infra_ui/flowy_infra_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+
+import '../image/custom_image_block_component/custom_image_block_component.dart';
 
 class LinkPreviewMenu extends StatefulWidget {
   const LinkPreviewMenu({
@@ -43,11 +47,24 @@ class _LinkPreviewMenuState extends State<LinkPreviewMenu> {
       child: Row(
         children: [
           const HSpace(4),
-          _CopyLinkButton(
+          MenuBlockButton(
+            tooltip: LocaleKeys.document_plugins_urlPreview_convertToLink.tr(),
+            iconData: FlowySvgs.m_toolbar_link_m,
+            onTap: () async => convertUrlPreviewNodeToLink(
+              context.read<EditorState>(),
+              widget.node,
+            ),
+          ),
+          const HSpace(4),
+          MenuBlockButton(
+            tooltip: LocaleKeys.editor_copyLink.tr(),
+            iconData: FlowySvgs.copy_s,
             onTap: copyImageLink,
           ),
           const _Divider(),
-          _DeleteButton(
+          MenuBlockButton(
+            tooltip: LocaleKeys.button_delete.tr(),
+            iconData: FlowySvgs.trash_s,
             onTap: deleteLinkPreviewNode,
           ),
           const HSpace(4),
@@ -57,12 +74,12 @@ class _LinkPreviewMenuState extends State<LinkPreviewMenu> {
   }
 
   void copyImageLink() {
-    final url = widget.node.attributes[ImageBlockKeys.url];
+    final url = widget.node.attributes[CustomImageBlockKeys.url];
     if (url != null) {
       Clipboard.setData(ClipboardData(text: url));
-      showSnackBarMessage(
+      showToastNotification(
         context,
-        LocaleKeys.document_plugins_urlPreview_copiedToPasteBoard.tr(),
+        message: LocaleKeys.document_plugins_urlPreview_copiedToPasteBoard.tr(),
       );
     }
   }
@@ -74,44 +91,6 @@ class _LinkPreviewMenuState extends State<LinkPreviewMenu> {
     transaction.deleteNode(node);
     transaction.afterSelection = null;
     await editorState.apply(transaction);
-  }
-}
-
-class _CopyLinkButton extends StatelessWidget {
-  const _CopyLinkButton({
-    required this.onTap,
-  });
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: const FlowySvg(
-        FlowySvgs.copy_s,
-        size: Size.square(16),
-      ),
-    );
-  }
-}
-
-class _DeleteButton extends StatelessWidget {
-  const _DeleteButton({
-    required this.onTap,
-  });
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: const FlowySvg(
-        FlowySvgs.delete_s,
-        size: Size.square(16),
-      ),
-    );
   }
 }
 

@@ -1,26 +1,22 @@
-import 'package:appflowy/plugins/database/application/field/field_controller.dart';
-import 'package:appflowy/plugins/database/application/view/view_cache.dart';
-import 'package:appflowy_backend/log.dart';
-import 'package:appflowy_backend/protobuf/flowy-database2/board_entities.pb.dart';
-import 'package:appflowy_backend/protobuf/flowy-database2/calendar_entities.pb.dart';
-import 'package:appflowy_backend/protobuf/flowy-database2/database_entities.pb.dart';
-import 'package:appflowy_backend/protobuf/flowy-database2/group.pb.dart';
-import 'package:appflowy_backend/protobuf/flowy-database2/group_changeset.pb.dart';
-import 'package:appflowy_backend/protobuf/flowy-database2/row_entities.pb.dart';
-import 'package:appflowy_backend/protobuf/flowy-database2/setting_entities.pb.dart';
-import 'package:appflowy_backend/protobuf/flowy-error/errors.pb.dart';
-import 'package:appflowy_backend/protobuf/flowy-folder/view.pb.dart';
-import 'package:collection/collection.dart';
 import 'dart:async';
-import 'package:dartz/dartz.dart';
+
 import 'package:flutter/material.dart';
 
-import 'database_view_service.dart';
+import 'package:appflowy/plugins/database/application/field/field_controller.dart';
+import 'package:appflowy/plugins/database/application/view/view_cache.dart';
+import 'package:appflowy/plugins/database/domain/database_view_service.dart';
+import 'package:appflowy/plugins/database/domain/group_listener.dart';
+import 'package:appflowy/plugins/database/domain/layout_service.dart';
+import 'package:appflowy/plugins/database/domain/layout_setting_listener.dart';
+import 'package:appflowy_backend/log.dart';
+import 'package:appflowy_backend/protobuf/flowy-database2/protobuf.dart';
+import 'package:appflowy_backend/protobuf/flowy-error/errors.pb.dart';
+import 'package:appflowy_backend/protobuf/flowy-folder/view.pb.dart';
+import 'package:appflowy_result/appflowy_result.dart';
+import 'package:collection/collection.dart';
+
 import 'defines.dart';
-import 'layout/layout_service.dart';
-import 'layout/layout_setting_listener.dart';
 import 'row/row_cache.dart';
-import 'group/group_listener.dart';
 
 typedef OnGroupConfigurationChanged = void Function(List<GroupSettingPB>);
 typedef OnGroupByField = void Function(List<GroupPB>);
@@ -73,9 +69,8 @@ class DatabaseCallbacks {
 }
 
 class DatabaseController {
-  DatabaseController({required ViewPB view})
-      : viewId = view.id,
-        _databaseViewBackendSvc = DatabaseViewBackendService(viewId: view.id),
+  DatabaseController({required this.view})
+      : _databaseViewBackendSvc = DatabaseViewBackendService(viewId: view.id),
         fieldController = FieldController(viewId: view.id),
         _groupListener = DatabaseGroupListener(view.id),
         databaseLayout = databaseLayoutFromViewLayout(view.layout),
@@ -91,7 +86,7 @@ class DatabaseController {
     _listenOnLayoutChanged();
   }
 
-  final String viewId;
+  final ViewPB view;
   final DatabaseViewBackendService _databaseViewBackendSvc;
   final FieldController fieldController;
   DatabaseLayoutPB databaseLayout;
@@ -105,6 +100,7 @@ class DatabaseController {
 
   // Getters
   RowCache get rowCache => _viewCache.rowCache;
+  String get viewId => view.id;
 
   // Listener
   final DatabaseGroupListener _groupListener;
@@ -136,7 +132,25 @@ class DatabaseController {
     }
   }
 
-  Future<Either<Unit, FlowyError>> open() async {
+  void removeListener({
+    DatabaseCallbacks? onDatabaseChanged,
+    DatabaseLayoutSettingCallbacks? onLayoutSettingsChanged,
+    GroupCallbacks? onGroupChanged,
+  }) {
+    if (onDatabaseChanged != null) {
+      _databaseCallbacks.remove(onDatabaseChanged);
+    }
+
+    if (onLayoutSettingsChanged != null) {
+      _layoutCallbacks.remove(onLayoutSettingsChanged);
+    }
+
+    if (onGroupChanged != null) {
+      _groupCallbacks.remove(onGroupChanged);
+    }
+  }
+
+  Future<FlowyResult<void, FlowyError>> open() async {
     return _databaseViewBackendSvc.openDatabase().then((result) {
       return result.fold(
         (DatabasePB database) async {
@@ -157,21 +171,21 @@ class DatabaseController {
               return Future(() async {
                 await _loadGroups();
                 await _loadLayoutSetting();
-                return left(fields);
+                return FlowyResult.success(fields);
               });
             },
             (err) {
               Log.error(err);
-              return right(err);
+              return FlowyResult.failure(err);
             },
           );
         },
-        (err) => right(err),
+        (err) => FlowyResult.failure(err),
       );
     });
   }
 
-  Future<Either<Unit, FlowyError>> moveGroupRow({
+  Future<FlowyResult<void, FlowyError>> moveGroupRow({
     required RowMetaPB fromRow,
     required String fromGroupId,
     required String toGroupId,
@@ -185,7 +199,7 @@ class DatabaseController {
     );
   }
 
-  Future<Either<Unit, FlowyError>> moveRow({
+  Future<FlowyResult<void, FlowyError>> moveRow({
     required String fromRowId,
     required String toRowId,
   }) {
@@ -195,7 +209,7 @@ class DatabaseController {
     );
   }
 
-  Future<Either<Unit, FlowyError>> moveGroup({
+  Future<FlowyResult<void, FlowyError>> moveGroup({
     required String fromGroupId,
     required String toGroupId,
   }) {
@@ -228,6 +242,7 @@ class DatabaseController {
     _databaseCallbacks.clear();
     _groupCallbacks.clear();
     _layoutCallbacks.clear();
+    _isLoading.dispose();
   }
 
   Future<void> _loadGroups() async {

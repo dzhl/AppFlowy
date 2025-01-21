@@ -1,3 +1,4 @@
+import 'package:appflowy/plugins/database/domain/database_view_service.dart';
 import 'package:appflowy/plugins/database/tab_bar/tab_bar_view.dart';
 import 'package:appflowy/plugins/database/widgets/database_layout_ext.dart';
 import 'package:appflowy/workspace/application/view/prelude.dart';
@@ -5,13 +6,12 @@ import 'package:appflowy/workspace/application/view/view_ext.dart';
 import 'package:appflowy_backend/log.dart';
 import 'package:appflowy_backend/protobuf/flowy-database2/protobuf.dart';
 import 'package:appflowy_backend/protobuf/flowy-folder/view.pb.dart';
-import 'package:appflowy_editor/appflowy_editor.dart' hide Log;
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
+import 'package:universal_platform/universal_platform.dart';
 
 import 'database_controller.dart';
-import 'database_view_service.dart';
 
 part 'tab_bar_bloc.freezed.dart';
 
@@ -52,7 +52,7 @@ class DatabaseTabBarBloc
             _createLinkedView(layout.layoutType, name ?? layout.layoutName);
           },
           deleteView: (String viewId) async {
-            final result = await ViewBackendService.delete(viewId: viewId);
+            final result = await ViewBackendService.deleteView(viewId: viewId);
             result.fold(
               (l) {},
               (r) => Log.error(r),
@@ -131,6 +131,7 @@ class DatabaseTabBarBloc
   Future<void> close() async {
     for (final tabBar in state.tabBars) {
       await state.tabBarControllerByViewId[tabBar.viewId]?.dispose();
+      tabBar.dispose();
     }
     return super.close();
   }
@@ -248,7 +249,7 @@ class DatabaseTabBarState with _$DatabaseTabBarState {
 class DatabaseTabBar extends Equatable {
   DatabaseTabBar({
     required this.view,
-  }) : _builder = PlatformExtension.isMobile
+  }) : _builder = UniversalPlatform.isMobile
             ? view.mobileTabBarItem()
             : view.tabBarItem();
 
@@ -261,6 +262,10 @@ class DatabaseTabBar extends Equatable {
 
   @override
   List<Object?> get props => [view.hashCode];
+
+  void dispose() {
+    _builder.dispose();
+  }
 }
 
 typedef OnViewUpdated = void Function(ViewPB newView);
@@ -288,7 +293,6 @@ class DatabaseTabBarController {
   OnViewChildViewChanged? onViewChildViewChanged;
 
   Future<void> dispose() async {
-    await viewListener.stop();
-    await controller.dispose();
+    await Future.wait([viewListener.stop(), controller.dispose()]);
   }
 }

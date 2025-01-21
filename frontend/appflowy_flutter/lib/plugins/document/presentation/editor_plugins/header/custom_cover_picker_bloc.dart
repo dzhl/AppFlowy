@@ -2,9 +2,10 @@ import 'dart:io';
 
 import 'package:appflowy/generated/locale_keys.g.dart';
 import 'package:appflowy/startup/startup.dart';
+import 'package:appflowy/util/default_extensions.dart';
 import 'package:appflowy/workspace/application/settings/prelude.dart';
 import 'package:appflowy_backend/protobuf/flowy-error/errors.pb.dart';
-import 'package:dartz/dartz.dart';
+import 'package:appflowy_result/appflowy_result.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flowy_infra/file_picker/file_picker_service.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -23,24 +24,26 @@ class CoverImagePickerBloc
     _dispatch();
   }
 
-  static const allowedExtensions = ['jpg', 'png', 'jpeg'];
-
   void _dispatch() {
     on<CoverImagePickerEvent>(
       (event, emit) async {
         await event.map(
-          initialEvent: (InitialEvent initialEvent) {
+          initialEvent: (initialEvent) {
             emit(const CoverImagePickerState.initial());
           },
-          urlSubmit: (UrlSubmit urlSubmit) async {
+          urlSubmit: (urlSubmit) async {
             emit(const CoverImagePickerState.loading());
             final validateImage = await _validateURL(urlSubmit.path);
             if (validateImage) {
-              emit(CoverImagePickerState.networkImage(left(urlSubmit.path)));
+              emit(
+                CoverImagePickerState.networkImage(
+                  FlowyResult.success(urlSubmit.path),
+                ),
+              );
             } else {
               emit(
                 CoverImagePickerState.networkImage(
-                  right(
+                  FlowyResult.failure(
                     FlowyError(
                       msg: LocaleKeys.document_plugins_cover_couldNotFetchImage
                           .tr(),
@@ -50,7 +53,7 @@ class CoverImagePickerBloc
               );
             }
           },
-          pickFileImage: (PickFileImage pickFileImage) async {
+          pickFileImage: (pickFileImage) async {
             final imagePickerResults = await _pickImages();
             if (imagePickerResults != null) {
               emit(CoverImagePickerState.fileImage(imagePickerResults));
@@ -58,18 +61,18 @@ class CoverImagePickerBloc
               emit(const CoverImagePickerState.initial());
             }
           },
-          deleteImage: (DeleteImage deleteImage) {
+          deleteImage: (deleteImage) {
             emit(const CoverImagePickerState.initial());
           },
-          saveToGallery: (SaveToGallery saveToGallery) async {
+          saveToGallery: (saveToGallery) async {
             emit(const CoverImagePickerState.loading());
             final saveImage = await _saveToGallery(saveToGallery.previousState);
             if (saveImage != null) {
-              emit(CoverImagePickerState.done(left(saveImage)));
+              emit(CoverImagePickerState.done(FlowyResult.success(saveImage)));
             } else {
               emit(
                 CoverImagePickerState.done(
-                  right(
+                  FlowyResult.failure(
                     FlowyError(
                       msg: LocaleKeys.document_plugins_cover_imageSavingFailed
                           .tr(),
@@ -90,7 +93,7 @@ class CoverImagePickerBloc
     final List<String> imagePaths = prefs.getStringList(kLocalImagesKey) ?? [];
     final directory = await _coverPath();
 
-    if (state is FileImagePicked) {
+    if (state is _FileImagePicked) {
       try {
         final path = state.path;
         final newPath = p.join(directory, p.split(path).last);
@@ -99,7 +102,7 @@ class CoverImagePickerBloc
       } catch (e) {
         return null;
       }
-    } else if (state is NetworkImagePicked) {
+    } else if (state is _NetworkImagePicked) {
       try {
         final url = state.successOrFail.fold((path) => path, (r) => null);
         if (url != null) {
@@ -124,7 +127,7 @@ class CoverImagePickerBloc
     final result = await getIt<FilePickerService>().pickFiles(
       dialogTitle: LocaleKeys.document_plugins_cover_addLocalImage.tr(),
       type: FileType.image,
-      allowedExtensions: allowedExtensions,
+      allowedExtensions: defaultImageExtensions,
     );
     if (result != null && result.files.isNotEmpty) {
       return result.files.first.path;
@@ -172,7 +175,7 @@ class CoverImagePickerBloc
     if (ext != null && ext.isNotEmpty) {
       ext = ext.substring(1);
     }
-    if (allowedExtensions.contains(ext)) {
+    if (defaultImageExtensions.contains(ext)) {
       return ext;
     }
     return null;
@@ -194,25 +197,25 @@ class CoverImagePickerBloc
 
 @freezed
 class CoverImagePickerEvent with _$CoverImagePickerEvent {
-  const factory CoverImagePickerEvent.urlSubmit(String path) = UrlSubmit;
-  const factory CoverImagePickerEvent.pickFileImage() = PickFileImage;
-  const factory CoverImagePickerEvent.deleteImage() = DeleteImage;
+  const factory CoverImagePickerEvent.urlSubmit(String path) = _UrlSubmit;
+  const factory CoverImagePickerEvent.pickFileImage() = _PickFileImage;
+  const factory CoverImagePickerEvent.deleteImage() = _DeleteImage;
   const factory CoverImagePickerEvent.saveToGallery(
     CoverImagePickerState previousState,
-  ) = SaveToGallery;
-  const factory CoverImagePickerEvent.initialEvent() = InitialEvent;
+  ) = _SaveToGallery;
+  const factory CoverImagePickerEvent.initialEvent() = _InitialEvent;
 }
 
 @freezed
 class CoverImagePickerState with _$CoverImagePickerState {
-  const factory CoverImagePickerState.initial() = Initial;
-  const factory CoverImagePickerState.loading() = Loading;
+  const factory CoverImagePickerState.initial() = _Initial;
+  const factory CoverImagePickerState.loading() = _Loading;
   const factory CoverImagePickerState.networkImage(
-    Either<String, FlowyError> successOrFail,
-  ) = NetworkImagePicked;
-  const factory CoverImagePickerState.fileImage(String path) = FileImagePicked;
+    FlowyResult<String, FlowyError> successOrFail,
+  ) = _NetworkImagePicked;
+  const factory CoverImagePickerState.fileImage(String path) = _FileImagePicked;
 
   const factory CoverImagePickerState.done(
-    Either<List<String>, FlowyError> successOrFail,
-  ) = Done;
+    FlowyResult<List<String>, FlowyError> successOrFail,
+  ) = _Done;
 }

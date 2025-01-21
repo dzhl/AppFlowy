@@ -1,3 +1,5 @@
+import 'package:appflowy/plugins/database/tab_bar/tab_bar_view.dart';
+import 'package:appflowy/startup/plugin/plugin.dart';
 import 'package:appflowy/workspace/application/view/view_ext.dart';
 import 'package:appflowy/workspace/application/view/view_listener.dart';
 import 'package:appflowy_backend/protobuf/flowy-folder/view.pb.dart';
@@ -28,11 +30,13 @@ class _DatabaseViewWidgetState extends State<DatabaseViewWidget> {
   /// The view will be updated by the [ViewListener].
   late ViewPB view;
 
+  late Plugin viewPlugin;
+
   @override
   void initState() {
     super.initState();
-
     view = widget.view;
+    viewPlugin = view.plugin()..init();
     _listenOnViewUpdated();
   }
 
@@ -40,6 +44,7 @@ class _DatabaseViewWidgetState extends State<DatabaseViewWidget> {
   void dispose() {
     _layoutTypeChangeNotifier.dispose();
     _listener.stop();
+    viewPlugin.dispose();
     super.dispose();
   }
 
@@ -47,12 +52,14 @@ class _DatabaseViewWidgetState extends State<DatabaseViewWidget> {
   Widget build(BuildContext context) {
     return ValueListenableBuilder<ViewLayoutPB>(
       valueListenable: _layoutTypeChangeNotifier,
-      builder: (_, __, ___) {
-        return view
-            .plugin()
-            .widgetBuilder
-            .buildWidget(shrinkWrap: widget.shrinkWrap);
-      },
+      builder: (_, __, ___) => viewPlugin.widgetBuilder.buildWidget(
+        shrinkWrap: widget.shrinkWrap,
+        context: PluginContext(),
+        data: {
+          kDatabasePluginWidgetBuilderHorizontalPadding:
+              view.layout == ViewLayoutPB.Grid ? 40.0 : 0.0,
+        },
+      ),
     );
   }
 

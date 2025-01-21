@@ -1,84 +1,94 @@
 import 'dart:async';
 import 'dart:typed_data';
+
 import 'package:appflowy/core/notification/grid_notification.dart';
-import 'package:appflowy_backend/protobuf/flowy-database2/sort_entities.pb.dart';
-import 'package:dartz/dartz.dart';
-import 'package:flowy_infra/notifier.dart';
-import 'package:appflowy_backend/protobuf/flowy-error/errors.pb.dart';
 import 'package:appflowy_backend/protobuf/flowy-database2/notification.pb.dart';
+import 'package:appflowy_backend/protobuf/flowy-database2/sort_entities.pb.dart';
 import 'package:appflowy_backend/protobuf/flowy-database2/view_entities.pb.dart';
+import 'package:appflowy_backend/protobuf/flowy-error/errors.pb.dart';
+import 'package:appflowy_result/appflowy_result.dart';
 
-typedef RowsVisibilityNotifierValue
-    = Either<RowsVisibilityChangePB, FlowyError>;
-
-typedef NumberOfRowsNotifierValue = Either<RowsChangePB, FlowyError>;
-typedef ReorderAllRowsNotifierValue = Either<List<String>, FlowyError>;
-typedef SingleRowNotifierValue = Either<ReorderSingleRowPB, FlowyError>;
+typedef RowsVisibilityCallback = void Function(
+  FlowyResult<RowsVisibilityChangePB, FlowyError>,
+);
+typedef NumberOfRowsCallback = void Function(
+  FlowyResult<RowsChangePB, FlowyError>,
+);
+typedef ReorderAllRowsCallback = void Function(
+  FlowyResult<List<String>, FlowyError>,
+);
+typedef SingleRowCallback = void Function(
+  FlowyResult<ReorderSingleRowPB, FlowyError>,
+);
 
 class DatabaseViewListener {
   DatabaseViewListener({required this.viewId});
 
   final String viewId;
-
-  PublishNotifier<NumberOfRowsNotifierValue>? _rowsNotifier = PublishNotifier();
-  PublishNotifier<ReorderAllRowsNotifierValue>? _reorderAllRows =
-      PublishNotifier();
-  PublishNotifier<SingleRowNotifierValue>? _reorderSingleRow =
-      PublishNotifier();
-  PublishNotifier<RowsVisibilityNotifierValue>? _rowsVisibility =
-      PublishNotifier();
-
   DatabaseNotificationListener? _listener;
 
   void start({
-    required void Function(NumberOfRowsNotifierValue) onRowsChanged,
-    required void Function(ReorderAllRowsNotifierValue) onReorderAllRows,
-    required void Function(SingleRowNotifierValue) onReorderSingleRow,
-    required void Function(RowsVisibilityNotifierValue) onRowsVisibilityChanged,
+    required NumberOfRowsCallback onRowsChanged,
+    required ReorderAllRowsCallback onReorderAllRows,
+    required SingleRowCallback onReorderSingleRow,
+    required RowsVisibilityCallback onRowsVisibilityChanged,
   }) {
-    if (_listener != null) {
-      _listener?.stop();
-    }
+    // Stop any existing listener
+    _listener?.stop();
 
+    // Initialize the notification listener
     _listener = DatabaseNotificationListener(
       objectId: viewId,
-      handler: _handler,
+      handler: (ty, result) => _handler(
+        ty,
+        result,
+        onRowsChanged,
+        onReorderAllRows,
+        onReorderSingleRow,
+        onRowsVisibilityChanged,
+      ),
     );
-
-    _rowsNotifier?.addPublishListener(onRowsChanged);
-    _rowsVisibility?.addPublishListener(onRowsVisibilityChanged);
-    _reorderAllRows?.addPublishListener(onReorderAllRows);
-    _reorderSingleRow?.addPublishListener(onReorderSingleRow);
   }
 
-  void _handler(DatabaseNotification ty, Either<Uint8List, FlowyError> result) {
+  void _handler(
+    DatabaseNotification ty,
+    FlowyResult<Uint8List, FlowyError> result,
+    NumberOfRowsCallback onRowsChanged,
+    ReorderAllRowsCallback onReorderAllRows,
+    SingleRowCallback onReorderSingleRow,
+    RowsVisibilityCallback onRowsVisibilityChanged,
+  ) {
     switch (ty) {
       case DatabaseNotification.DidUpdateViewRowsVisibility:
         result.fold(
-          (payload) => _rowsVisibility?.value =
-              left(RowsVisibilityChangePB.fromBuffer(payload)),
-          (error) => _rowsVisibility?.value = right(error),
+          (payload) => onRowsVisibilityChanged(
+            FlowyResult.success(RowsVisibilityChangePB.fromBuffer(payload)),
+          ),
+          (error) => onRowsVisibilityChanged(FlowyResult.failure(error)),
         );
         break;
-      case DatabaseNotification.DidUpdateViewRows:
+      case DatabaseNotification.DidUpdateRow:
         result.fold(
-          (payload) =>
-              _rowsNotifier?.value = left(RowsChangePB.fromBuffer(payload)),
-          (error) => _rowsNotifier?.value = right(error),
+          (payload) => onRowsChanged(
+            FlowyResult.success(RowsChangePB.fromBuffer(payload)),
+          ),
+          (error) => onRowsChanged(FlowyResult.failure(error)),
         );
         break;
       case DatabaseNotification.DidReorderRows:
         result.fold(
-          (payload) => _reorderAllRows?.value =
-              left(ReorderAllRowsPB.fromBuffer(payload).rowOrders),
-          (error) => _reorderAllRows?.value = right(error),
+          (payload) => onReorderAllRows(
+            FlowyResult.success(ReorderAllRowsPB.fromBuffer(payload).rowOrders),
+          ),
+          (error) => onReorderAllRows(FlowyResult.failure(error)),
         );
         break;
       case DatabaseNotification.DidReorderSingleRow:
         result.fold(
-          (payload) => _reorderSingleRow?.value =
-              left(ReorderSingleRowPB.fromBuffer(payload)),
-          (error) => _reorderSingleRow?.value = right(error),
+          (payload) => onReorderSingleRow(
+            FlowyResult.success(ReorderSingleRowPB.fromBuffer(payload)),
+          ),
+          (error) => onReorderSingleRow(FlowyResult.failure(error)),
         );
         break;
       default:
@@ -88,16 +98,6 @@ class DatabaseViewListener {
 
   Future<void> stop() async {
     await _listener?.stop();
-    _rowsVisibility?.dispose();
-    _rowsVisibility = null;
-
-    _rowsNotifier?.dispose();
-    _rowsNotifier = null;
-
-    _reorderAllRows?.dispose();
-    _reorderAllRows = null;
-
-    _reorderSingleRow?.dispose();
-    _reorderSingleRow = null;
+    _listener = null;
   }
 }

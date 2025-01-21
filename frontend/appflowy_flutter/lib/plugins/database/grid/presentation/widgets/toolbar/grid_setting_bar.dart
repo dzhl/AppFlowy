@@ -1,6 +1,6 @@
 import 'package:appflowy/plugins/database/application/database_controller.dart';
-import 'package:appflowy/plugins/database/grid/application/filter/filter_menu_bloc.dart';
-import 'package:appflowy/plugins/database/grid/application/sort/sort_menu_bloc.dart';
+import 'package:appflowy/plugins/database/grid/application/filter/filter_editor_bloc.dart';
+import 'package:appflowy/plugins/database/grid/application/sort/sort_editor_bloc.dart';
 import 'package:appflowy/plugins/database/grid/presentation/grid_page.dart';
 import 'package:appflowy/plugins/database/widgets/setting/setting_button.dart';
 import 'package:flowy_infra_ui/flowy_infra_ui.dart';
@@ -24,53 +24,41 @@ class GridSettingBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiBlocProvider(
       providers: [
-        BlocProvider<GridFilterMenuBloc>(
-          create: (context) => GridFilterMenuBloc(
+        BlocProvider(
+          create: (context) => FilterEditorBloc(
             viewId: controller.viewId,
             fieldController: controller.fieldController,
-          )..add(const GridFilterMenuEvent.initial()),
+          ),
         ),
-        BlocProvider<SortMenuBloc>(
-          create: (context) => SortMenuBloc(
+        BlocProvider(
+          create: (context) => SortEditorBloc(
             viewId: controller.viewId,
             fieldController: controller.fieldController,
-          )..add(const SortMenuEvent.initial()),
+          ),
         ),
       ],
-      child: MultiBlocListener(
-        listeners: [
-          BlocListener<GridFilterMenuBloc, GridFilterMenuState>(
-            listenWhen: (p, c) => p.isVisible != c.isVisible,
-            listener: (context, state) => toggleExtension.toggle(),
-          ),
-          BlocListener<SortMenuBloc, SortMenuState>(
-            listenWhen: (p, c) => p.isVisible != c.isVisible,
-            listener: (context, state) => toggleExtension.toggle(),
-          ),
-        ],
-        child: ValueListenableBuilder<bool>(
-          valueListenable: controller.isLoading,
-          builder: (context, value, child) {
-            if (value) {
-              return const SizedBox.shrink();
-            }
-            return SizedBox(
-              height: 20,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  const FilterButton(),
-                  const HSpace(2),
-                  const SortButton(),
-                  const HSpace(2),
-                  SettingButton(
-                    databaseController: controller,
-                  ),
-                ],
-              ),
-            );
-          },
-        ),
+      child: ValueListenableBuilder<bool>(
+        valueListenable: controller.isLoading,
+        builder: (context, isLoading, child) {
+          if (isLoading) {
+            return const SizedBox.shrink();
+          }
+          return SizedBox(
+            height: 20,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                FilterButton(toggleExtension: toggleExtension),
+                const HSpace(6),
+                SortButton(toggleExtension: toggleExtension),
+                const HSpace(6),
+                SettingButton(
+                  databaseController: controller,
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }

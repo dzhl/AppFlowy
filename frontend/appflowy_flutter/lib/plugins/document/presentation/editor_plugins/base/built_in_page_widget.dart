@@ -1,23 +1,18 @@
 import 'package:appflowy/generated/flowy_svgs.g.dart';
+import 'package:appflowy/generated/locale_keys.g.dart';
 import 'package:appflowy/plugins/document/presentation/editor_plugins/plugins.dart';
-import 'package:appflowy/startup/plugin/plugin.dart';
 import 'package:appflowy/startup/startup.dart';
 import 'package:appflowy/workspace/application/tabs/tabs_bloc.dart';
+import 'package:appflowy/workspace/application/view/view_ext.dart';
 import 'package:appflowy/workspace/application/view/view_service.dart';
 import 'package:appflowy/workspace/presentation/widgets/pop_up_action.dart';
 import 'package:appflowy_backend/protobuf/flowy-error/errors.pbserver.dart';
 import 'package:appflowy_backend/protobuf/flowy-folder/view.pb.dart';
 import 'package:appflowy_editor/appflowy_editor.dart';
-import 'package:dartz/dartz.dart' as dartz;
-import 'package:flowy_infra_ui/style_widget/text.dart';
-import 'package:flowy_infra_ui/widget/spacing.dart';
-import 'package:flutter/material.dart';
-import 'package:appflowy/generated/locale_keys.g.dart';
+import 'package:appflowy_result/appflowy_result.dart';
 import 'package:easy_localization/easy_localization.dart';
-
-import 'package:appflowy/workspace/application/view/view_ext.dart';
-import 'package:appflowy_popover/appflowy_popover.dart';
-import 'package:flowy_infra_ui/style_widget/icon_button.dart';
+import 'package:flowy_infra_ui/flowy_infra_ui.dart';
+import 'package:flutter/material.dart';
 
 class BuiltInPageWidget extends StatefulWidget {
   const BuiltInPageWidget({
@@ -36,7 +31,8 @@ class BuiltInPageWidget extends StatefulWidget {
 }
 
 class _BuiltInPageWidgetState extends State<BuiltInPageWidget> {
-  late Future<dartz.Either<FlowyError, ViewPB>> future;
+  late Future<FlowyResult<ViewPB, FlowyError>> future;
+
   final focusNode = FocusNode();
 
   String get parentViewId => widget.node.attributes[DatabaseBlockKeys.parentID];
@@ -45,14 +41,10 @@ class _BuiltInPageWidgetState extends State<BuiltInPageWidget> {
   @override
   void initState() {
     super.initState();
-    future = ViewBackendService()
-        .getChildView(
-          parentViewId: parentViewId,
-          childViewId: childViewId,
-        )
-        .then(
-          (value) => value.swap(),
-        );
+    future = ViewBackendService().getChildView(
+      parentViewId: parentViewId,
+      childViewId: childViewId,
+    );
   }
 
   @override
@@ -63,24 +55,21 @@ class _BuiltInPageWidgetState extends State<BuiltInPageWidget> {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<dartz.Either<FlowyError, ViewPB>>(
+    return FutureBuilder<FlowyResult<ViewPB, FlowyError>>(
       builder: (context, snapshot) {
-        final page = snapshot.data?.toOption().toNullable();
+        final page = snapshot.data?.toNullable();
         if (snapshot.hasData && page != null) {
           return _build(context, page);
         }
+
         if (snapshot.connectionState == ConnectionState.done) {
-          WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
-            // just delete the page if it is not found
-            _deletePage();
-          });
-          return const Center(
-            child: FlowyText('Cannot load the page'),
-          );
+          // Delete the page if not found
+          WidgetsBinding.instance.addPostFrameCallback((_) => _deletePage());
+
+          return const Center(child: FlowyText('Cannot load the page'));
         }
-        return const Center(
-          child: CircularProgressIndicator(),
-        );
+
+        return const Center(child: CircularProgressIndicator());
       },
       future: future,
     );
@@ -90,20 +79,18 @@ class _BuiltInPageWidgetState extends State<BuiltInPageWidget> {
     return MouseRegion(
       onEnter: (_) => widget.editorState.service.scrollService?.disable(),
       onExit: (_) => widget.editorState.service.scrollService?.enable(),
-      child: SizedBox(
-        height: viewPB.pluginType == PluginType.calendar ? 700 : 400,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildMenu(context, viewPB),
-            Expanded(child: _buildPage(context, viewPB)),
-          ],
-        ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildMenu(context, viewPB),
+          Flexible(child: _buildPage(context, viewPB)),
+        ],
       ),
     );
   }
 
-  Widget _buildPage(BuildContext context, ViewPB viewPB) {
+  Widget _buildPage(BuildContext context, ViewPB view) {
     return Focus(
       focusNode: focusNode,
       onFocusChange: (value) {
@@ -111,11 +98,11 @@ class _BuiltInPageWidgetState extends State<BuiltInPageWidget> {
           widget.editorState.service.selectionService.clearSelection();
         }
       },
-      child: widget.builder(viewPB),
+      child: widget.builder(view),
     );
   }
 
-  Widget _buildMenu(BuildContext context, ViewPB viewPB) {
+  Widget _buildMenu(BuildContext context, ViewPB view) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       mainAxisAlignment: MainAxisAlignment.center,
@@ -123,7 +110,7 @@ class _BuiltInPageWidgetState extends State<BuiltInPageWidget> {
         // information
         FlowyIconButton(
           tooltipText: LocaleKeys.tooltip_referencePage.tr(
-            namedArgs: {'name': viewPB.layout.name},
+            namedArgs: {'name': view.layout.name},
           ),
           width: 24,
           height: 24,
@@ -131,7 +118,6 @@ class _BuiltInPageWidgetState extends State<BuiltInPageWidget> {
           icon: const FlowySvg(
             FlowySvgs.information_s,
           ),
-          iconColorOnHover: Theme.of(context).colorScheme.onSecondary,
         ),
         // setting
         const Space(7, 0),
@@ -145,7 +131,6 @@ class _BuiltInPageWidgetState extends State<BuiltInPageWidget> {
             width: 24,
             height: 24,
             iconPadding: const EdgeInsets.all(3),
-            iconColorOnHover: Theme.of(context).colorScheme.onSecondary,
             icon: const FlowySvg(
               FlowySvgs.settings_s,
             ),
@@ -156,8 +141,8 @@ class _BuiltInPageWidgetState extends State<BuiltInPageWidget> {
               case _ActionType.viewDatabase:
                 getIt<TabsBloc>().add(
                   TabsEvent.openPlugin(
-                    plugin: viewPB.plugin(),
-                    view: viewPB,
+                    plugin: view.plugin(),
+                    view: view,
                   ),
                 );
                 break;
@@ -181,10 +166,7 @@ class _BuiltInPageWidgetState extends State<BuiltInPageWidget> {
   }
 }
 
-enum _ActionType {
-  viewDatabase,
-  delete,
-}
+enum _ActionType { viewDatabase, delete }
 
 class _ActionWrapper extends ActionCell {
   _ActionWrapper(this.inner);
