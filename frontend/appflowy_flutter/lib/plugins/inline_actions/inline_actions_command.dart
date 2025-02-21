@@ -1,7 +1,9 @@
+import 'package:appflowy/mobile/presentation/inline_actions/mobile_inline_actions_menu.dart';
 import 'package:appflowy/plugins/inline_actions/inline_actions_menu.dart';
 import 'package:appflowy/plugins/inline_actions/inline_actions_result.dart';
 import 'package:appflowy/plugins/inline_actions/inline_actions_service.dart';
 import 'package:appflowy_editor/appflowy_editor.dart';
+import 'package:universal_platform/universal_platform.dart';
 
 const inlineActionCharacter = '@';
 
@@ -20,13 +22,14 @@ CharacterShortcutEvent inlineActionsCommand(
     );
 
 InlineActionsMenuService? selectionMenuService;
+
 Future<bool> inlineActionsCommandHandler(
   EditorState editorState,
   InlineActionsService service,
   InlineActionsMenuStyle style,
 ) async {
   final selection = editorState.selection;
-  if (PlatformExtension.isMobile || selection == null) {
+  if (selection == null) {
     return false;
   }
 
@@ -41,7 +44,7 @@ Future<bool> inlineActionsCommandHandler(
 
   final List<InlineActionsResult> initialResults = [];
   for (final handler in service.handlers) {
-    final group = await handler();
+    final group = await handler.search(null);
 
     if (group.results.isNotEmpty) {
       initialResults.add(group);
@@ -49,15 +52,31 @@ Future<bool> inlineActionsCommandHandler(
   }
 
   if (service.context != null) {
-    selectionMenuService = InlineActionsMenu(
-      context: service.context!,
-      editorState: editorState,
-      service: service,
-      initialResults: initialResults,
-      style: style,
-    );
+    keepEditorFocusNotifier.increase();
+    selectionMenuService?.dismiss();
+    selectionMenuService = UniversalPlatform.isMobile
+        ? MobileInlineActionsMenu(
+            context: service.context!,
+            editorState: editorState,
+            service: service,
+            initialResults: initialResults,
+            style: style,
+          )
+        : InlineActionsMenu(
+            context: service.context!,
+            editorState: editorState,
+            service: service,
+            initialResults: initialResults,
+            style: style,
+          );
 
-    selectionMenuService?.show();
+    // disable the keyboard service
+    editorState.service.keyboardService?.disable();
+
+    await selectionMenuService?.show();
+
+    // enable the keyboard service
+    editorState.service.keyboardService?.enable();
   }
 
   return true;

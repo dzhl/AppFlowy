@@ -13,6 +13,7 @@ enum FlowyOptionTileType {
 
 class FlowyOptionTile extends StatelessWidget {
   const FlowyOptionTile._({
+    super.key,
     required this.type,
     this.showTopBorder = true,
     this.showBottomBorder = true,
@@ -35,26 +36,34 @@ class FlowyOptionTile extends StatelessWidget {
     this.content,
     this.backgroundColor,
     this.fontFamily,
+    this.height,
+    this.enable = true,
   });
 
   factory FlowyOptionTile.text({
-    required String text,
+    String? text,
+    Widget? content,
     Color? textColor,
     bool showTopBorder = true,
     bool showBottomBorder = true,
     Widget? leftIcon,
     Widget? trailing,
     VoidCallback? onTap,
+    double? height,
+    bool enable = true,
   }) {
     return FlowyOptionTile._(
       type: FlowyOptionTileType.text,
       text: text,
+      content: content,
       textColor: textColor,
       onTap: onTap,
       showTopBorder: showTopBorder,
       showBottomBorder: showBottomBorder,
       leading: leftIcon,
       trailing: trailing,
+      height: height,
+      enable: enable,
     );
   }
 
@@ -71,6 +80,7 @@ class FlowyOptionTile extends StatelessWidget {
     Widget? trailing,
     String? textFieldHintText,
     bool autofocus = false,
+    bool enable = true,
   }) {
     return FlowyOptionTile._(
       type: FlowyOptionTileType.textField,
@@ -84,24 +94,30 @@ class FlowyOptionTile extends StatelessWidget {
       onTextChanged: onTextChanged,
       onTextSubmitted: onTextSubmitted,
       autofocus: autofocus,
+      enable: enable,
     );
   }
 
   factory FlowyOptionTile.checkbox({
+    Key? key,
     required String text,
     required bool isSelected,
     required VoidCallback? onTap,
+    Color? textColor,
     Widget? leftIcon,
     Widget? content,
     bool showTopBorder = true,
     bool showBottomBorder = true,
     String? fontFamily,
     Color? backgroundColor,
+    bool enable = true,
   }) {
     return FlowyOptionTile._(
+      key: key,
       type: FlowyOptionTileType.checkbox,
       isSelected: isSelected,
       text: text,
+      textColor: textColor,
       content: content,
       onTap: onTap,
       fontFamily: fontFamily,
@@ -109,6 +125,7 @@ class FlowyOptionTile extends StatelessWidget {
       showTopBorder: showTopBorder,
       showBottomBorder: showBottomBorder,
       leading: leftIcon,
+      enable: enable,
       trailing: isSelected
           ? const FlowySvg(
               FlowySvgs.m_blue_check_s,
@@ -126,6 +143,7 @@ class FlowyOptionTile extends StatelessWidget {
     bool showTopBorder = true,
     bool showBottomBorder = true,
     Widget? leftIcon,
+    bool enable = true,
   }) {
     return FlowyOptionTile._(
       type: FlowyOptionTileType.toggle,
@@ -136,6 +154,7 @@ class FlowyOptionTile extends StatelessWidget {
       showBottomBorder: showBottomBorder,
       leading: leftIcon,
       trailing: _Toggle(value: isSelected, onChanged: onValueChanged),
+      enable: enable,
     );
   }
 
@@ -169,24 +188,31 @@ class FlowyOptionTile extends StatelessWidget {
   final Color? backgroundColor;
   final String? fontFamily;
 
+  final double? height;
+
+  final bool enable;
+
   @override
   Widget build(BuildContext context) {
     final leadingWidget = _buildLeading();
 
-    final child = FlowyOptionDecorateBox(
+    Widget child = FlowyOptionDecorateBox(
       color: backgroundColor,
       showTopBorder: showTopBorder,
       showBottomBorder: showBottomBorder,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-        child: Row(
-          children: [
-            if (leadingWidget != null) leadingWidget,
-            if (content != null) content!,
-            if (content == null) _buildText(),
-            if (content == null) _buildTextField(),
-            if (trailing != null) trailing!,
-          ],
+      child: SizedBox(
+        height: height,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          child: Row(
+            children: [
+              if (leadingWidget != null) leadingWidget,
+              if (content != null) content!,
+              if (content == null) _buildText(),
+              if (content == null) _buildTextField(),
+              if (trailing != null) trailing!,
+            ],
+          ),
         ),
       ),
     );
@@ -194,9 +220,18 @@ class FlowyOptionTile extends StatelessWidget {
     if (type == FlowyOptionTileType.checkbox ||
         type == FlowyOptionTileType.toggle ||
         type == FlowyOptionTileType.text) {
-      return GestureDetector(
+      child = GestureDetector(
         onTap: onTap,
         child: child,
+      );
+    }
+
+    if (!enable) {
+      child = Opacity(
+        opacity: 0.5,
+        child: IgnorePointer(
+          child: child,
+        ),
       );
     }
 
@@ -218,7 +253,7 @@ class FlowyOptionTile extends StatelessWidget {
 
     final padding = EdgeInsets.symmetric(
       horizontal: leading == null ? 0.0 : 12.0,
-      vertical: 16.0,
+      vertical: 14.0,
     );
 
     return Expanded(
@@ -284,7 +319,7 @@ class _Toggle extends StatelessWidget {
         fit: BoxFit.fill,
         child: CupertinoSwitch(
           value: value,
-          activeColor: Theme.of(context).colorScheme.primary,
+          activeTrackColor: Theme.of(context).colorScheme.primary,
           onChanged: onChanged,
         ),
       ),

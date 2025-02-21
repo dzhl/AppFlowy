@@ -38,6 +38,7 @@ class _LanguageSettingGroupState extends State<LanguageSettingGroup> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   FlowyText(
+                    lineHeight: 1.0,
                     languageFromLocale(locale),
                     color: theme.colorScheme.onSurface,
                   ),
@@ -48,7 +49,7 @@ class _LanguageSettingGroupState extends State<LanguageSettingGroup> {
                 final newLocale =
                     await context.push<Locale>(LanguagePickerScreen.routeName);
                 if (newLocale != null && newLocale != locale) {
-                  if (mounted) {
+                  if (context.mounted) {
                     context
                         .read<AppearanceSettingsCubit>()
                         .setLocale(context, newLocale);

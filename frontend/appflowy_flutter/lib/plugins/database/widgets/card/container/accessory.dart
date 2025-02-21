@@ -11,10 +11,6 @@ abstract mixin class CardAccessory implements Widget {
   void onTap(BuildContext context) {}
 }
 
-typedef CardAccessoryBuilder = List<CardAccessory> Function(
-  BuildContext buildContext,
-);
-
 class CardAccessoryContainer extends StatelessWidget {
   const CardAccessoryContainer({
     super.key,
@@ -27,6 +23,10 @@ class CardAccessoryContainer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (accessories.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
     final children = accessories.map<Widget>((accessory) {
       return GestureDetector(
         behavior: HitTestBehavior.opaque,
@@ -44,7 +44,7 @@ class CardAccessoryContainer extends StatelessWidget {
         width: 1,
         thickness: 1,
         color: Theme.of(context).brightness == Brightness.light
-            ? const Color(0xFF1F2329).withOpacity(0.12)
+            ? const Color(0xFF1F2329).withValues(alpha: 0.12)
             : const Color(0xff59647a),
       ),
     );
@@ -76,19 +76,19 @@ class CardAccessoryContainer extends StatelessWidget {
       border: Border.fromBorderSide(
         BorderSide(
           color: Theme.of(context).brightness == Brightness.light
-              ? const Color(0xFF1F2329).withOpacity(0.12)
+              ? const Color(0xFF1F2329).withValues(alpha: 0.12)
               : const Color(0xff59647a),
         ),
       ),
       boxShadow: [
         BoxShadow(
           blurRadius: 4,
-          color: const Color(0xFF1F2329).withOpacity(0.02),
+          color: const Color(0xFF1F2329).withValues(alpha: 0.02),
         ),
         BoxShadow(
           blurRadius: 4,
           spreadRadius: -2,
-          color: const Color(0xFF1F2329).withOpacity(0.02),
+          color: const Color(0xFF1F2329).withValues(alpha: 0.02),
         ),
       ],
     );

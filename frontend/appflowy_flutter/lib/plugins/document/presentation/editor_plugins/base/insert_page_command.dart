@@ -1,7 +1,7 @@
 import 'package:appflowy/generated/locale_keys.g.dart';
-import 'package:appflowy/plugins/database/application/database_view_service.dart';
-import 'package:appflowy/plugins/document/presentation/editor_plugins/mention/mention_block.dart';
+import 'package:appflowy/plugins/database/domain/database_view_service.dart';
 import 'package:appflowy/plugins/document/presentation/editor_plugins/plugins.dart';
+import 'package:appflowy/workspace/application/view/view_ext.dart';
 import 'package:appflowy/workspace/application/view/view_service.dart';
 import 'package:appflowy_backend/protobuf/flowy-error/errors.pb.dart';
 import 'package:appflowy_backend/protobuf/flowy-folder/view.pb.dart';
@@ -87,7 +87,7 @@ extension InsertDatabase on EditorState {
     // get the database id that the view is associated with
     final databaseId = await DatabaseViewBackendService(viewId: view.id)
         .getDatabaseId()
-        .then((value) => value.swap().toOption().toNullable());
+        .then((value) => value.toNullable());
 
     if (databaseId == null) {
       throw StateError(
@@ -98,10 +98,10 @@ extension InsertDatabase on EditorState {
     final prefix = _referencedDatabasePrefix(view.layout);
     final ref = await ViewBackendService.createDatabaseLinkedView(
       parentViewId: view.id,
-      name: "$prefix ${view.name}",
+      name: "$prefix ${view.nameOrDefault}",
       layoutType: view.layout,
       databaseId: databaseId,
-    ).then((value) => value.swap().toOption().toNullable());
+    ).then((value) => value.toNullable());
 
     if (ref == null) {
       throw FlowyError(

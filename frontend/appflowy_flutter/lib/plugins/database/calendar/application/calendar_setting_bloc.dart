@@ -1,5 +1,5 @@
 import 'package:appflowy/plugins/database/application/database_controller.dart';
-import 'package:appflowy/plugins/database/application/layout/layout_setting_listener.dart';
+import 'package:appflowy/plugins/database/domain/layout_setting_listener.dart';
 import 'package:appflowy_backend/log.dart';
 import 'package:appflowy_backend/protobuf/flowy-database2/protobuf.dart';
 import 'package:bloc/bloc.dart';
@@ -7,8 +7,6 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:protobuf/protobuf.dart';
 
 part 'calendar_setting_bloc.freezed.dart';
-
-typedef DayOfWeek = int;
 
 class CalendarSettingBloc
     extends Bloc<CalendarSettingEvent, CalendarSettingState> {
@@ -25,6 +23,12 @@ class CalendarSettingBloc
 
   final DatabaseController _databaseController;
   final DatabaseLayoutSettingListener _listener;
+
+  @override
+  Future<void> close() async {
+    await _listener.stop();
+    return super.close();
+  }
 
   void _dispatch() {
     on<CalendarSettingEvent>((event, emit) {
@@ -107,12 +111,6 @@ class CalendarSettingBloc
         );
       },
     );
-  }
-
-  @override
-  Future<void> close() async {
-    await _listener.stop();
-    return super.close();
   }
 }
 

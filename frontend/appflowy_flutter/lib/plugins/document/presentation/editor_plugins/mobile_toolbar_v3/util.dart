@@ -1,5 +1,5 @@
 import 'package:appflowy/generated/flowy_svgs.g.dart';
-import 'package:appflowy/plugins/document/presentation/editor_plugins/mobile_toolbar_v3/_toolbar_theme.dart';
+import 'package:appflowy/plugins/document/presentation/editor_plugins/mobile_toolbar_v3/aa_menu/_toolbar_theme.dart';
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:flowy_infra_ui/flowy_infra_ui.dart';
 import 'package:flutter/material.dart';
@@ -11,6 +11,7 @@ class MobileToolbarMenuItemWrapper extends StatelessWidget {
     this.icon,
     this.text,
     this.backgroundColor,
+    this.selectedBackgroundColor,
     this.enable,
     this.fontFamily,
     required this.isSelected,
@@ -23,6 +24,7 @@ class MobileToolbarMenuItemWrapper extends StatelessWidget {
     this.showRightArrow = false,
     this.textPadding = EdgeInsets.zero,
     required this.onTap,
+    this.iconColor,
   });
 
   final Size size;
@@ -40,18 +42,22 @@ class MobileToolbarMenuItemWrapper extends StatelessWidget {
   final bool showDownArrow;
   final bool showRightArrow;
   final Color? backgroundColor;
+  final Color? selectedBackgroundColor;
   final EdgeInsets textPadding;
+  final Color? iconColor;
 
   @override
   Widget build(BuildContext context) {
     final theme = ToolbarColorExtension.of(context);
-    Color? iconColor;
-    if (enable != null) {
-      iconColor = enable! ? null : theme.toolbarMenuIconDisabledColor;
-    } else {
-      iconColor = isSelected
-          ? theme.toolbarMenuIconSelectedColor
-          : theme.toolbarMenuIconColor;
+    Color? iconColor = this.iconColor;
+    if (iconColor == null) {
+      if (enable != null) {
+        iconColor = enable! ? null : theme.toolbarMenuIconDisabledColor;
+      } else {
+        iconColor = isSelected
+            ? theme.toolbarMenuIconSelectedColor
+            : theme.toolbarMenuIconColor;
+      }
     }
     final textColor =
         enable == false ? theme.toolbarMenuIconDisabledColor : null;
@@ -60,10 +66,7 @@ class MobileToolbarMenuItemWrapper extends StatelessWidget {
     final radius = Radius.circular(12 * scale);
     final Widget child;
     if (icon != null) {
-      child = FlowySvg(
-        icon!,
-        color: iconColor,
-      );
+      child = FlowySvg(icon!, color: iconColor);
     } else if (text != null) {
       child = Padding(
         padding: textPadding * scale,
@@ -90,7 +93,8 @@ class MobileToolbarMenuItemWrapper extends StatelessWidget {
             alignment: text != null ? Alignment.centerLeft : Alignment.center,
             decoration: BoxDecoration(
               color: isSelected
-                  ? theme.toolbarMenuItemSelectedBackgroundColor
+                  ? (selectedBackgroundColor ??
+                      theme.toolbarMenuItemSelectedBackgroundColor)
                   : backgroundColor,
               borderRadius: BorderRadius.only(
                 topLeft: enableTopLeftRadius ? radius : Radius.zero,
@@ -130,16 +134,12 @@ class ScaledVerticalDivider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return HSpace(
-      1.5 * context.scale,
-    );
+    return HSpace(1.5 * context.scale);
   }
 }
 
 class ScaledVSpace extends StatelessWidget {
-  const ScaledVSpace({
-    super.key,
-  });
+  const ScaledVSpace({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -159,10 +159,7 @@ final _blocksCanContainChildren = [
 ];
 
 extension MobileToolbarEditorState on EditorState {
-  bool isBlockTypeSelected(
-    String blockType, {
-    int? level,
-  }) {
+  bool isBlockTypeSelected(String blockType, {int? level}) {
     final selection = this.selection;
     if (selection == null) {
       return false;
@@ -179,9 +176,7 @@ extension MobileToolbarEditorState on EditorState {
     return type == blockType;
   }
 
-  bool isTextDecorationSelected(
-    String richTextKey,
-  ) {
+  bool isTextDecorationSelected(String richTextKey) {
     final selection = this.selection;
     if (selection == null) {
       return false;
@@ -196,22 +191,20 @@ extension MobileToolbarEditorState on EditorState {
         if (selection.startIndex != 0) {
           // get previous index text style
           isSelected = nodes.allSatisfyInSelection(
-              selection.copyWith(
-                start: selection.start.copyWith(
-                  offset: selection.startIndex - 1,
-                ),
-              ), (delta) {
-            return delta.everyAttributes(
+            selection.copyWith(
+              start: selection.start.copyWith(
+                offset: selection.startIndex - 1,
+              ),
+            ),
+            (delta) => delta.everyAttributes(
               (attributes) => attributes[richTextKey] == true,
-            );
-          });
+            ),
+          );
         }
       }
     } else {
       isSelected = nodes.allSatisfyInSelection(selection, (delta) {
-        return delta.everyAttributes(
-          (attributes) => attributes[richTextKey] == true,
-        );
+        return delta.everyAttributes((attr) => attr[richTextKey] == true);
       });
     }
     return isSelected;
@@ -245,7 +238,7 @@ extension MobileToolbarEditorState on EditorState {
       needToDeleteChildren = true;
       transaction.insertNodes(
         selection.end.path.next,
-        node.children.map((e) => e.copyWith()),
+        node.children.map((e) => e.deepCopy()),
       );
       await apply(transaction);
     }
@@ -314,9 +307,7 @@ extension MobileToolbarEditorState on EditorState {
         text.isNotEmpty &&
         selection.isCollapsed) {
       final attributes = href != null && href.isNotEmpty
-          ? {
-              AppFlowyRichTextKeys.href: href,
-            }
+          ? {AppFlowyRichTextKeys.href: href}
           : null;
       transaction.insertText(
         node,
@@ -341,12 +332,27 @@ extension MobileToolbarEditorState on EditorState {
         node,
         selection.startIndex,
         text.length,
-        {
-          AppFlowyRichTextKeys.href: href?.isEmpty == true ? null : href,
-        },
+        {AppFlowyRichTextKeys.href: href?.isEmpty == true ? null : href},
       );
     }
 
+    await apply(transaction);
+  }
+
+  Future<void> insertBlockAfterCurrentSelection(
+    Selection selection,
+    Node node,
+  ) async {
+    final path = selection.end.path.next;
+    final transaction = this.transaction;
+    transaction.insertNode(
+      path,
+      node,
+    );
+    transaction.afterSelection = Selection.collapsed(
+      Position(path: path),
+    );
+    transaction.selectionExtraInfo = {};
     await apply(transaction);
   }
 }

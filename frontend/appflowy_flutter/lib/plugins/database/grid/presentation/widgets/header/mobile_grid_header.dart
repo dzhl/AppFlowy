@@ -5,6 +5,7 @@ import 'package:appflowy/plugins/database/application/field/field_controller.dar
 import 'package:appflowy/plugins/database/application/field/field_info.dart';
 import 'package:appflowy/plugins/database/grid/application/grid_bloc.dart';
 import 'package:appflowy/plugins/database/grid/application/grid_header_bloc.dart';
+import 'package:appflowy/workspace/application/view/view_lock_status_bloc.dart';
 import 'package:collection/collection.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flowy_infra/theme_extension.dart';
@@ -13,17 +14,22 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../layout/sizes.dart';
+import '../../mobile_grid_page.dart';
 import 'mobile_field_button.dart';
+
+const double _kGridHeaderHeight = 50.0;
 
 class MobileGridHeader extends StatefulWidget {
   const MobileGridHeader({
     super.key,
     required this.viewId,
-    required this.anchorScrollController,
+    required this.contentScrollController,
+    required this.reorderableController,
   });
 
   final String viewId;
-  final ScrollController anchorScrollController;
+  final ScrollController contentScrollController;
+  final ScrollController reorderableController;
 
   @override
   State<MobileGridHeader> createState() => _MobileGridHeaderState();
@@ -34,6 +40,8 @@ class _MobileGridHeaderState extends State<MobileGridHeader> {
   Widget build(BuildContext context) {
     final fieldController =
         context.read<GridBloc>().databaseController.fieldController;
+    final isLocked =
+        context.read<ViewLockStatusBloc?>()?.state.isLocked ?? false;
     return BlocProvider(
       create: (context) {
         return GridHeaderBloc(
@@ -41,29 +49,48 @@ class _MobileGridHeaderState extends State<MobileGridHeader> {
           fieldController: fieldController,
         )..add(const GridHeaderEvent.initial());
       },
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        controller: widget.anchorScrollController,
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            HSpace(GridSize.leadingHeaderPadding),
-            Stack(
-              children: [
-                Positioned(top: 0, left: 24, right: 24, child: _divider()),
-                Positioned(bottom: 0, left: 0, right: 0, child: _divider()),
-                SizedBox(
-                  height: 50,
-                  child: _GridHeader(
-                    viewId: widget.viewId,
-                    fieldController: fieldController,
-                  ),
+      child: Stack(
+        children: [
+          BlocBuilder<GridHeaderBloc, GridHeaderState>(
+            builder: (context, state) {
+              return SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                controller: widget.contentScrollController,
+                child: Stack(
+                  children: [
+                    Positioned(
+                      top: 0,
+                      left: GridSize.horizontalHeaderPadding + 24,
+                      right: GridSize.horizontalHeaderPadding + 24,
+                      child: _divider(),
+                    ),
+                    Positioned(
+                      bottom: 0,
+                      left: GridSize.horizontalHeaderPadding,
+                      right: GridSize.horizontalHeaderPadding,
+                      child: _divider(),
+                    ),
+                    SizedBox(
+                      height: _kGridHeaderHeight,
+                      width: getMobileGridContentWidth(state.fields),
+                    ),
+                  ],
                 ),
-              ],
+              );
+            },
+          ),
+          IgnorePointer(
+            ignoring: isLocked,
+            child: SizedBox(
+              height: _kGridHeaderHeight,
+              child: _GridHeader(
+                viewId: widget.viewId,
+                fieldController: fieldController,
+                scrollController: widget.reorderableController,
+              ),
             ),
-            const HSpace(20),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -81,10 +108,12 @@ class _GridHeader extends StatefulWidget {
   const _GridHeader({
     required this.viewId,
     required this.fieldController,
+    required this.scrollController,
   });
 
   final String viewId;
   final FieldController fieldController;
+  final ScrollController scrollController;
 
   @override
   State<_GridHeader> createState() => _GridHeaderState();
@@ -114,12 +143,15 @@ class _GridHeaderState extends State<_GridHeader> {
             .toList();
 
         return ReorderableListView.builder(
-          scrollController: ScrollController(),
+          scrollController: widget.scrollController,
           shrinkWrap: true,
           scrollDirection: Axis.horizontal,
           proxyDecorator: (child, index, anim) => Material(
             color: Colors.transparent,
             child: child,
+          ),
+          padding: EdgeInsets.symmetric(
+            horizontal: GridSize.horizontalHeaderPadding,
           ),
           header: firstField != null
               ? MobileFieldButton.first(
@@ -152,7 +184,7 @@ class _GridHeaderState extends State<_GridHeader> {
   }
 }
 
-class CreateFieldButton extends StatefulWidget {
+class CreateFieldButton extends StatelessWidget {
   const CreateFieldButton({
     super.key,
     required this.viewId,
@@ -163,14 +195,12 @@ class CreateFieldButton extends StatefulWidget {
   final void Function(String fieldId) onFieldCreated;
 
   @override
-  State<CreateFieldButton> createState() => _CreateFieldButtonState();
-}
-
-class _CreateFieldButtonState extends State<CreateFieldButton> {
-  @override
   Widget build(BuildContext context) {
     return Container(
-      width: 200,
+      constraints: BoxConstraints(
+        maxWidth: GridSize.mobileNewPropertyButtonWidth,
+        minHeight: GridSize.headerHeight,
+      ),
       decoration: _getDecoration(context),
       child: FlowyButton(
         margin: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
@@ -182,7 +212,7 @@ class _CreateFieldButtonState extends State<CreateFieldButton> {
           color: Theme.of(context).hintColor,
         ),
         hoverColor: AFThemeExtension.of(context).greyHover,
-        onTap: () => showCreateFieldBottomSheet(context, widget.viewId),
+        onTap: () => mobileCreateFieldWorkflow(context, viewId),
         leftIconSize: const Size.square(18),
         leftIcon: FlowySvg(
           FlowySvgs.add_s,

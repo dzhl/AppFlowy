@@ -4,7 +4,7 @@ import 'package:appflowy_backend/log.dart';
 import 'package:appflowy_backend/protobuf/flowy-error/errors.pb.dart';
 import 'package:appflowy_backend/protobuf/flowy-folder/workspace.pb.dart';
 import 'package:appflowy_backend/protobuf/flowy-user/user_profile.pb.dart';
-import 'package:dartz/dartz.dart';
+import 'package:appflowy_result/appflowy_result.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
@@ -13,7 +13,7 @@ part 'menu_user_bloc.freezed.dart';
 class MenuUserBloc extends Bloc<MenuUserEvent, MenuUserState> {
   MenuUserBloc(this.userProfile)
       : _userListener = UserListener(userProfile: userProfile),
-        _userWorkspaceListener = UserWorkspaceListener(),
+        _userWorkspaceListener = FolderListener(),
         _userService = UserBackendService(userId: userProfile.id),
         super(MenuUserState.initial(userProfile)) {
     _dispatch();
@@ -21,7 +21,7 @@ class MenuUserBloc extends Bloc<MenuUserEvent, MenuUserState> {
 
   final UserBackendService _userService;
   final UserListener _userListener;
-  final UserWorkspaceListener _userWorkspaceListener;
+  final FolderListener _userWorkspaceListener;
   final UserProfilePB userProfile;
 
   @override
@@ -38,9 +38,6 @@ class MenuUserBloc extends Bloc<MenuUserEvent, MenuUserState> {
           initial: () async {
             _userListener.start(onProfileUpdated: _profileUpdated);
             await _initUser();
-          },
-          fetchWorkspaces: () async {
-            //
           },
           didReceiveUserProfile: (UserProfilePB newUserProfile) {
             emit(state.copyWith(userProfile: newUserProfile));
@@ -63,14 +60,14 @@ class MenuUserBloc extends Bloc<MenuUserEvent, MenuUserState> {
     result.fold((l) => null, (error) => Log.error(error));
   }
 
-  void _profileUpdated(Either<UserProfilePB, FlowyError> userProfileOrFailed) {
+  void _profileUpdated(
+    FlowyResult<UserProfilePB, FlowyError> userProfileOrFailed,
+  ) {
     if (isClosed) {
       return;
     }
     userProfileOrFailed.fold(
-      (newUserProfile) => add(
-        MenuUserEvent.didReceiveUserProfile(newUserProfile),
-      ),
+      (profile) => add(MenuUserEvent.didReceiveUserProfile(profile)),
       (err) => Log.error(err),
     );
   }
@@ -79,7 +76,6 @@ class MenuUserBloc extends Bloc<MenuUserEvent, MenuUserState> {
 @freezed
 class MenuUserEvent with _$MenuUserEvent {
   const factory MenuUserEvent.initial() = _Initial;
-  const factory MenuUserEvent.fetchWorkspaces() = _FetchWorkspaces;
   const factory MenuUserEvent.updateUserName(String name) = _UpdateUserName;
   const factory MenuUserEvent.didReceiveUserProfile(
     UserProfilePB newUserProfile,
@@ -90,13 +86,13 @@ class MenuUserEvent with _$MenuUserEvent {
 class MenuUserState with _$MenuUserState {
   const factory MenuUserState({
     required UserProfilePB userProfile,
-    required Option<List<WorkspacePB>> workspaces,
-    required Either<Unit, String> successOrFailure,
+    required List<WorkspacePB>? workspaces,
+    required FlowyResult<void, String> successOrFailure,
   }) = _MenuUserState;
 
   factory MenuUserState.initial(UserProfilePB userProfile) => MenuUserState(
         userProfile: userProfile,
-        workspaces: none(),
-        successOrFailure: left(unit),
+        workspaces: null,
+        successOrFailure: FlowyResult.success(null),
       );
 }

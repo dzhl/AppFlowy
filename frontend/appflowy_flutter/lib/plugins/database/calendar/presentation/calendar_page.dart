@@ -1,5 +1,3 @@
-import 'package:flutter/material.dart';
-
 import 'package:appflowy/generated/flowy_svgs.g.dart';
 import 'package:appflowy/generated/locale_keys.g.dart';
 import 'package:appflowy/mobile/presentation/bottom_sheet/bottom_sheet.dart';
@@ -8,29 +6,33 @@ import 'package:appflowy/mobile/presentation/presentation.dart';
 import 'package:appflowy/plugins/database/application/database_controller.dart';
 import 'package:appflowy/plugins/database/calendar/application/calendar_bloc.dart';
 import 'package:appflowy/plugins/database/calendar/application/unschedule_event_bloc.dart';
+import 'package:appflowy/plugins/database/grid/presentation/grid_page.dart';
 import 'package:appflowy/plugins/database/grid/presentation/layout/sizes.dart';
+import 'package:appflowy/plugins/database/tab_bar/desktop/setting_menu.dart';
 import 'package:appflowy/plugins/database/tab_bar/tab_bar_view.dart';
-import 'package:appflowy_backend/protobuf/flowy-database2/calendar_entities.pb.dart';
+import 'package:appflowy/workspace/application/user/user_workspace_bloc.dart';
+import 'package:appflowy/workspace/application/view/view_lock_status_bloc.dart';
+import 'package:appflowy_backend/protobuf/flowy-database2/protobuf.dart';
 import 'package:appflowy_backend/protobuf/flowy-folder/view.pb.dart';
-import 'package:appflowy_editor/appflowy_editor.dart';
-import 'package:appflowy_popover/appflowy_popover.dart';
 import 'package:calendar_view/calendar_view.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flowy_infra/size.dart';
 import 'package:flowy_infra/theme_extension.dart';
 import 'package:flowy_infra_ui/flowy_infra_ui.dart';
-import 'package:flowy_infra_ui/widget/flowy_tooltip.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:universal_platform/universal_platform.dart';
 
 import '../../application/row/row_controller.dart';
 import '../../widgets/row/row_detail.dart';
-
 import 'calendar_day.dart';
 import 'layout/sizes.dart';
 import 'toolbar/calendar_setting_bar.dart';
 
-class CalendarPageTabBarBuilderImpl implements DatabaseTabBarItemBuilder {
+class CalendarPageTabBarBuilderImpl extends DatabaseTabBarItemBuilder {
+  final _toggleExtension = ToggleExtensionNotifier();
+
   @override
   Widget content(
     BuildContext context,
@@ -52,6 +54,7 @@ class CalendarPageTabBarBuilderImpl implements DatabaseTabBarItemBuilder {
     return CalendarSettingBar(
       key: _makeValueKey(controller),
       databaseController: controller,
+      toggleExtension: _toggleExtension,
     );
   }
 
@@ -60,7 +63,18 @@ class CalendarPageTabBarBuilderImpl implements DatabaseTabBarItemBuilder {
     BuildContext context,
     DatabaseController controller,
   ) {
-    return SizedBox.fromSize();
+    return DatabaseViewSettingExtension(
+      key: _makeValueKey(controller),
+      viewId: controller.viewId,
+      databaseController: controller,
+      toggleExtension: _toggleExtension,
+    );
+  }
+
+  @override
+  void dispose() {
+    _toggleExtension.dispose();
+    super.dispose();
   }
 
   ValueKey _makeValueKey(DatabaseController controller) {
@@ -91,12 +105,11 @@ class _CalendarPageState extends State<CalendarPage> {
 
   @override
   void initState() {
+    super.initState();
     _calendarState = GlobalKey<MonthViewState>();
     _calendarBloc = CalendarBloc(
       databaseController: widget.databaseController,
     )..add(const CalendarEvent.initial());
-
-    super.initState();
   }
 
   @override
@@ -109,8 +122,18 @@ class _CalendarPageState extends State<CalendarPage> {
   Widget build(BuildContext context) {
     return CalendarControllerProvider(
       controller: _eventController,
-      child: BlocProvider<CalendarBloc>.value(
-        value: _calendarBloc,
+      child: MultiBlocProvider(
+        providers: [
+          BlocProvider<CalendarBloc>.value(
+            value: _calendarBloc,
+          ),
+          BlocProvider(
+            create: (context) => ViewLockStatusBloc(view: widget.view)
+              ..add(
+                ViewLockStatusEvent.initial(),
+              ),
+          ),
+        ],
         child: MultiBlocListener(
           listeners: [
             BlocListener<CalendarBloc, CalendarState>(
@@ -153,6 +176,18 @@ class _CalendarPageState extends State<CalendarPage> {
                 }
               },
             ),
+            BlocListener<CalendarBloc, CalendarState>(
+              listenWhen: (p, c) => p.openRow != c.openRow,
+              listener: (context, state) {
+                if (state.openRow != null) {
+                  showEventDetails(
+                    context: context,
+                    databaseController: _calendarBloc.databaseController,
+                    rowMeta: state.openRow!,
+                  );
+                }
+              },
+            ),
           ],
           child: BlocBuilder<CalendarBloc, CalendarState>(
             builder: (context, state) {
@@ -167,8 +202,7 @@ class _CalendarPageState extends State<CalendarPage> {
                   return _buildCalendar(
                     context,
                     _eventController,
-                    state.settings
-                        .foldLeft(0, (previous, a) => a.firstDayOfWeek),
+                    state.settings?.firstDayOfWeek ?? 0,
                   );
                 },
               );
@@ -187,10 +221,17 @@ class _CalendarPageState extends State<CalendarPage> {
     return LayoutBuilder(
       // must specify MonthView width for useAvailableVerticalSpace to work properly
       builder: (context, constraints) {
+        EdgeInsets padding = UniversalPlatform.isMobile
+            ? CalendarSize.contentInsetsMobile
+            : CalendarSize.contentInsets +
+                const EdgeInsets.symmetric(horizontal: 40);
+        final double horizontalPadding =
+            context.read<DatabasePluginWidgetBuilderSize>().horizontalPadding;
+        if (horizontalPadding == 0) {
+          padding = padding.copyWith(left: 0, right: 0);
+        }
         return Padding(
-          padding: PlatformExtension.isMobile
-              ? CalendarSize.contentInsetsMobile
-              : CalendarSize.contentInsets,
+          padding: padding,
           child: ScrollConfiguration(
             behavior:
                 ScrollConfiguration.of(context).copyWith(scrollbars: false),
@@ -198,12 +239,26 @@ class _CalendarPageState extends State<CalendarPage> {
               key: _calendarState,
               controller: _eventController,
               width: constraints.maxWidth,
-              cellAspectRatio: PlatformExtension.isMobile ? 0.9 : 0.6,
+              cellAspectRatio: UniversalPlatform.isMobile ? 0.9 : 0.6,
               startDay: _weekdayFromInt(firstDayOfWeek),
               showBorder: false,
               headerBuilder: _headerNavigatorBuilder,
               weekDayBuilder: _headerWeekDayBuilder,
-              cellBuilder: _calendarDayBuilder,
+              cellBuilder: (
+                date,
+                calenderEvents,
+                isToday,
+                isInMonth,
+                position,
+              ) =>
+                  _calendarDayBuilder(
+                context,
+                date,
+                calenderEvents,
+                isToday,
+                isInMonth,
+                position,
+              ),
               useAvailableVerticalSpace: widget.shrinkWrap,
             ),
           ),
@@ -218,7 +273,7 @@ class _CalendarPageState extends State<CalendarPage> {
       child: Row(
         children: [
           GestureDetector(
-            onTap: PlatformExtension.isMobile
+            onTap: UniversalPlatform.isMobile
                 ? () => showMobileBottomSheet(
                       context,
                       title: LocaleKeys.calendar_quickJumpYear.tr(),
@@ -245,7 +300,7 @@ class _CalendarPageState extends State<CalendarPage> {
                   DateFormat('MMMM y', context.locale.toLanguageTag())
                       .format(currentMonth),
                 ),
-                if (PlatformExtension.isMobile) ...[
+                if (UniversalPlatform.isMobile) ...[
                   const HSpace(6),
                   const FlowySvg(FlowySvgs.arrow_down_s),
                 ],
@@ -266,6 +321,7 @@ class _CalendarPageState extends State<CalendarPage> {
             fillColor: Colors.transparent,
             fontWeight: FontWeight.w400,
             fontSize: 10,
+            fontColor: AFThemeExtension.of(context).textColor,
             tooltip: LocaleKeys.calendar_navigation_jumpToday.tr(),
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
             hoverColor: AFThemeExtension.of(context).lightGreyHover,
@@ -294,7 +350,7 @@ class _CalendarPageState extends State<CalendarPage> {
     final symbols = DateFormat.EEEE(context.locale.toLanguageTag()).dateSymbols;
     String weekDayString = symbols.WEEKDAYS[(day + 1) % 7];
 
-    if (PlatformExtension.isMobile) {
+    if (UniversalPlatform.isMobile) {
       weekDayString = weekDayString.substring(0, 3);
     }
 
@@ -311,6 +367,7 @@ class _CalendarPageState extends State<CalendarPage> {
   }
 
   Widget _calendarDayBuilder(
+    BuildContext context,
     DateTime date,
     List<CalendarEventData<CalendarDayEvent>> calenderEvents,
     isToday,
@@ -322,17 +379,22 @@ class _CalendarPageState extends State<CalendarPage> {
     // is implemnted in the develop branch(WIP). Will be replaced with that.
     final events = calenderEvents.map((value) => value.event!).toList()
       ..sort((a, b) => a.event.timestamp.compareTo(b.event.timestamp));
+    final isLocked =
+        context.watch<ViewLockStatusBloc?>()?.state.isLocked ?? false;
 
-    return CalendarDayCard(
-      viewId: widget.view.id,
-      isToday: isToday,
-      isInMonth: isInMonth,
-      events: events,
-      date: date,
-      rowCache: _calendarBloc.rowCache,
-      onCreateEvent: (date) =>
-          _calendarBloc.add(CalendarEvent.createEvent(date)),
-      position: position,
+    return IgnorePointer(
+      ignoring: isLocked,
+      child: CalendarDayCard(
+        viewId: widget.view.id,
+        isToday: isToday,
+        isInMonth: isInMonth,
+        events: events,
+        date: date,
+        rowCache: _calendarBloc.rowCache,
+        onCreateEvent: (date) =>
+            _calendarBloc.add(CalendarEvent.createEvent(date)),
+        position: position,
+      ),
     );
   }
 
@@ -345,10 +407,10 @@ class _CalendarPageState extends State<CalendarPage> {
 void showEventDetails({
   required BuildContext context,
   required DatabaseController databaseController,
-  required CalendarEventPB event,
+  required RowMetaPB rowMeta,
 }) {
   final rowController = RowController(
-    rowMeta: event.rowMeta,
+    rowMeta: rowMeta,
     viewId: databaseController.viewId,
     rowCache: databaseController.rowCache,
   );
@@ -356,9 +418,13 @@ void showEventDetails({
   FlowyOverlay.show(
     context: context,
     builder: (BuildContext overlayContext) {
-      return RowDetailPage(
-        rowController: rowController,
-        databaseController: databaseController,
+      return BlocProvider.value(
+        value: context.read<UserWorkspaceBloc>(),
+        child: RowDetailPage(
+          rowController: rowController,
+          databaseController: databaseController,
+          userProfile: context.read<CalendarBloc>().userProfile,
+        ),
       );
     },
   );
@@ -375,13 +441,7 @@ class UnscheduledEventsButton extends StatefulWidget {
 }
 
 class _UnscheduledEventsButtonState extends State<UnscheduledEventsButton> {
-  late final PopoverController _popoverController;
-
-  @override
-  void initState() {
-    super.initState();
-    _popoverController = PopoverController();
-  }
+  final PopoverController _popoverController = PopoverController();
 
   @override
   Widget build(BuildContext context) {
@@ -405,11 +465,10 @@ class _UnscheduledEventsButtonState extends State<UnscheduledEventsButton> {
                 ),
                 side: BorderSide(color: Theme.of(context).dividerColor),
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                visualDensity: VisualDensity.compact,
               ),
               onPressed: () {
                 if (state.unscheduleEvents.isNotEmpty) {
-                  if (PlatformExtension.isMobile) {
+                  if (UniversalPlatform.isMobile) {
                     _showUnscheduledEventsMobile(state.unscheduleEvents);
                   } else {
                     _popoverController.show();
@@ -427,12 +486,20 @@ class _UnscheduledEventsButtonState extends State<UnscheduledEventsButton> {
                 ),
               ),
             ),
-            popupBuilder: (context) {
-              return UnscheduleEventsList(
+            popupBuilder: (_) => MultiBlocProvider(
+              providers: [
+                BlocProvider.value(
+                  value: context.read<CalendarBloc>(),
+                ),
+                BlocProvider.value(
+                  value: context.read<UserWorkspaceBloc>(),
+                ),
+              ],
+              child: UnscheduleEventsList(
                 databaseController: widget.databaseController,
                 unscheduleEvents: state.unscheduleEvents,
-              );
-            },
+              ),
+            ),
           );
         },
       ),
@@ -445,7 +512,7 @@ class _UnscheduledEventsButtonState extends State<UnscheduledEventsButton> {
         builder: (_) {
           return Column(
             children: [
-              FlowyText.medium(
+              FlowyText(
                 LocaleKeys.calendar_settings_unscheduledEventsTitle.tr(),
               ),
               UnscheduleEventsList(
@@ -471,10 +538,10 @@ class UnscheduleEventsList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cells = [
-      if (!PlatformExtension.isMobile)
+      if (!UniversalPlatform.isMobile)
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-          child: FlowyText.medium(
+          child: FlowyText(
             LocaleKeys.calendar_settings_clickToAdd.tr(),
             fontSize: 10,
             color: Theme.of(context).hintColor,
@@ -485,7 +552,7 @@ class UnscheduleEventsList extends StatelessWidget {
         (event) => UnscheduledEventCell(
           event: event,
           onPressed: () {
-            if (PlatformExtension.isMobile) {
+            if (UniversalPlatform.isMobile) {
               context.push(
                 MobileRowDetailPage.routeName,
                 extra: {
@@ -497,7 +564,7 @@ class UnscheduleEventsList extends StatelessWidget {
             } else {
               showEventDetails(
                 context: context,
-                event: event,
+                rowMeta: event.rowMeta,
                 databaseController: databaseController,
               );
               PopoverContainer.of(context).close();
@@ -515,7 +582,7 @@ class UnscheduleEventsList extends StatelessWidget {
       shrinkWrap: true,
     );
 
-    if (PlatformExtension.isMobile) {
+    if (UniversalPlatform.isMobile) {
       return Flexible(child: child);
     }
 
@@ -535,7 +602,7 @@ class UnscheduledEventCell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return PlatformExtension.isMobile
+    return UniversalPlatform.isMobile
         ? MobileUnscheduledEventTile(event: event, onPressed: onPressed)
         : DesktopUnscheduledEventTile(event: event, onPressed: onPressed);
   }
@@ -557,7 +624,7 @@ class DesktopUnscheduledEventTile extends StatelessWidget {
       height: 26,
       child: FlowyButton(
         margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-        text: FlowyText.medium(
+        text: FlowyText(
           event.title.isEmpty
               ? LocaleKeys.calendar_defaultNewCalendarTitle.tr()
               : event.title,

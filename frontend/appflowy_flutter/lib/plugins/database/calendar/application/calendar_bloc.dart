@@ -7,8 +7,9 @@ import 'package:appflowy_backend/dispatch/dispatch.dart';
 import 'package:appflowy_backend/log.dart';
 import 'package:appflowy_backend/protobuf/flowy-database2/protobuf.dart';
 import 'package:appflowy_backend/protobuf/flowy-error/protobuf.dart';
+import 'package:appflowy_backend/protobuf/flowy-user/user_profile.pb.dart';
+import 'package:appflowy_result/appflowy_result.dart';
 import 'package:calendar_view/calendar_view.dart';
-import 'package:dartz/dartz.dart';
 import 'package:fixnum/fixnum.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
@@ -33,26 +34,47 @@ class CalendarBloc extends Bloc<CalendarEvent, CalendarState> {
   CellMemCache get cellCache => databaseController.rowCache.cellCache;
   RowCache get rowCache => databaseController.rowCache;
 
+  UserProfilePB? _userProfile;
+  UserProfilePB? get userProfile => _userProfile;
+
+  DatabaseCallbacks? _databaseCallbacks;
+  DatabaseLayoutSettingCallbacks? _layoutSettingCallbacks;
+
+  @override
+  Future<void> close() async {
+    databaseController.removeListener(
+      onDatabaseChanged: _databaseCallbacks,
+      onLayoutSettingsChanged: _layoutSettingCallbacks,
+    );
+    _databaseCallbacks = null;
+    _layoutSettingCallbacks = null;
+    await super.close();
+  }
+
   void _dispatch() {
     on<CalendarEvent>(
       (event, emit) async {
         await event.when(
           initial: () async {
+            final result = await UserEventGetUserProfile().send();
+            result.fold(
+              (profile) => _userProfile = profile,
+              (err) => Log.error('Failed to get user profile: $err'),
+            );
+
             _startListening();
             await _openDatabase(emit);
             _loadAllEvents();
           },
           didReceiveCalendarSettings: (CalendarLayoutSettingPB settings) {
             // If the field id changed, reload all events
-            state.settings.fold(() => null, (oldSetting) {
-              if (oldSetting.fieldId != settings.fieldId) {
-                _loadAllEvents();
-              }
-            });
-            emit(state.copyWith(settings: Some(settings)));
+            if (state.settings?.fieldId != settings.fieldId) {
+              _loadAllEvents();
+            }
+            emit(state.copyWith(settings: settings));
           },
           didReceiveDatabaseUpdate: (DatabasePB database) {
-            emit(state.copyWith(database: Some(database)));
+            emit(state.copyWith(database: database));
           },
           didLoadAllEvents: (events) {
             final calenderEvents = _calendarEventDataFromEventPBs(events);
@@ -65,6 +87,20 @@ class CalendarBloc extends Bloc<CalendarEvent, CalendarState> {
           },
           createEvent: (DateTime date) async {
             await _createEvent(date);
+          },
+          duplicateEvent: (String viewId, String rowId) async {
+            final result = await RowBackendService.duplicateRow(viewId, rowId);
+            result.fold(
+              (_) => null,
+              (e) => Log.error('Failed to duplicate event: $e', e),
+            );
+          },
+          deleteEvent: (String viewId, String rowId) async {
+            final result = await RowBackendService.deleteRows(viewId, [rowId]);
+            result.fold(
+              (_) => null,
+              (e) => Log.error('Failed to delete event: $e', e),
+            );
           },
           newEventPopupDisplayed: () {
             emit(state.copyWith(editingEvent: null));
@@ -100,6 +136,7 @@ class CalendarBloc extends Bloc<CalendarEvent, CalendarState> {
                 deleteEventIds: deletedRowIds,
               ),
             );
+            emit(state.copyWith(deleteEventIds: const []));
           },
           didReceiveEvent: (CalendarEventData<CalendarDayEvent> event) {
             emit(
@@ -108,6 +145,11 @@ class CalendarBloc extends Bloc<CalendarEvent, CalendarState> {
                 newEvent: event,
               ),
             );
+            emit(state.copyWith(newEvent: null));
+          },
+          openRowDetail: (row) {
+            emit(state.copyWith(openRow: row));
+            emit(state.copyWith(openRow: null));
           },
         );
       },
@@ -132,45 +174,47 @@ class CalendarBloc extends Bloc<CalendarEvent, CalendarState> {
       (database) {
         databaseController.setIsLoading(false);
         emit(
-          state.copyWith(loadingState: LoadingState.finish(left(unit))),
+          state.copyWith(
+            loadingState: LoadingState.finish(FlowyResult.success(null)),
+          ),
         );
       },
       (err) => emit(
-        state.copyWith(loadingState: LoadingState.finish(right(err))),
+        state.copyWith(
+          loadingState: LoadingState.finish(FlowyResult.failure(err)),
+        ),
       ),
     );
   }
 
   Future<void> _createEvent(DateTime date) async {
-    return state.settings.fold(
-      () {
-        Log.warn('Calendar settings not found');
-      },
-      (settings) async {
-        final dateField = _getCalendarFieldInfo(settings.fieldId);
-        if (dateField != null) {
-          final newRow = await RowBackendService.createRow(
-            viewId: viewId,
-            withCells: (builder) => builder.insertDate(dateField, date),
-          ).then(
-            (result) => result.fold(
-              (newRow) => newRow,
-              (err) {
-                Log.error(err);
-                return null;
-              },
-            ),
-          );
+    final settings = state.settings;
+    if (settings == null) {
+      Log.warn('Calendar settings not found');
+      return;
+    }
+    final dateField = _getCalendarFieldInfo(settings.fieldId);
+    if (dateField != null) {
+      final newRow = await RowBackendService.createRow(
+        viewId: viewId,
+        withCells: (builder) => builder.insertDate(dateField, date),
+      ).then(
+        (result) => result.fold(
+          (newRow) => newRow,
+          (err) {
+            Log.error(err);
+            return null;
+          },
+        ),
+      );
 
-          if (newRow != null) {
-            final event = await _loadEvent(newRow.id);
-            if (event != null && !isClosed) {
-              add(CalendarEvent.didCreateEvent(event));
-            }
-          }
+      if (newRow != null) {
+        final event = await _loadEvent(newRow.id);
+        if (event != null && !isClosed) {
+          add(CalendarEvent.didCreateEvent(event));
         }
-      },
-    );
+      }
+    }
   }
 
   Future<void> _moveEvent(CalendarDayEvent event, DateTime date) async {
@@ -206,16 +250,14 @@ class CalendarBloc extends Bloc<CalendarEvent, CalendarState> {
   }
 
   Future<CalendarEventData<CalendarDayEvent>?> _loadEvent(RowId rowId) async {
-    final payload = RowIdPB(viewId: viewId, rowId: rowId);
-    return DatabaseEventGetCalendarEvent(payload).send().then((result) {
-      return result.fold(
-        (eventPB) => _calendarEventDataFromEventPB(eventPB),
-        (r) {
-          Log.error(r);
-          return null;
-        },
-      );
-    });
+    final payload = DatabaseViewRowIdPB(viewId: viewId, rowId: rowId);
+    return DatabaseEventGetCalendarEvent(payload).send().fold(
+      (eventPB) => _calendarEventDataFromEventPB(eventPB),
+      (r) {
+        Log.error(r);
+        return null;
+      },
+    );
   }
 
   void _loadAllEvents() async {
@@ -272,7 +314,7 @@ class CalendarBloc extends Bloc<CalendarEvent, CalendarState> {
   }
 
   void _startListening() {
-    final onDatabaseChanged = DatabaseCallbacks(
+    _databaseCallbacks = DatabaseCallbacks(
       onDatabaseChanged: (database) {
         if (isClosed) return;
       },
@@ -284,14 +326,18 @@ class CalendarBloc extends Bloc<CalendarEvent, CalendarState> {
           for (final fieldInfo in fieldInfos) fieldInfo.field.id: fieldInfo,
         };
       },
-      onRowsCreated: (rowIds) async {
+      onRowsCreated: (rows) async {
         if (isClosed) {
           return;
         }
-        for (final id in rowIds) {
-          final event = await _loadEvent(id);
-          if (event != null && !isClosed) {
-            add(CalendarEvent.didReceiveEvent(event));
+        for (final row in rows) {
+          if (row.isHiddenInView) {
+            add(CalendarEvent.openRowDetail(row.rowMeta));
+          } else {
+            final event = await _loadEvent(row.rowMeta.id);
+            if (event != null) {
+              add(CalendarEvent.didReceiveEvent(event));
+            }
           }
         }
       },
@@ -317,15 +363,39 @@ class CalendarBloc extends Bloc<CalendarEvent, CalendarState> {
           }
         }
       },
+      onNumOfRowsChanged: (rows, rowById, reason) {
+        reason.maybeWhen(
+          updateRowsVisibility: (changeset) async {
+            if (isClosed) {
+              return;
+            }
+            for (final id in changeset.invisibleRows) {
+              if (_containsEvent(id)) {
+                add(CalendarEvent.didDeleteEvents([id]));
+              }
+            }
+            for (final row in changeset.visibleRows) {
+              final id = row.rowMeta.id;
+              if (!_containsEvent(id)) {
+                final event = await _loadEvent(id);
+                if (event != null) {
+                  add(CalendarEvent.didReceiveEvent(event));
+                }
+              }
+            }
+          },
+          orElse: () {},
+        );
+      },
     );
 
-    final onLayoutSettingsChanged = DatabaseLayoutSettingCallbacks(
+    _layoutSettingCallbacks = DatabaseLayoutSettingCallbacks(
       onLayoutSettingsChanged: _didReceiveLayoutSetting,
     );
 
     databaseController.addListener(
-      onDatabaseChanged: onDatabaseChanged,
-      onLayoutSettingsChanged: onLayoutSettingsChanged,
+      onDatabaseChanged: _databaseCallbacks,
+      onLayoutSettingsChanged: _layoutSettingCallbacks,
     );
   }
 
@@ -346,6 +416,10 @@ class CalendarBloc extends Bloc<CalendarEvent, CalendarState> {
       return false;
     }
     return state.allEvents[index].date.day != event.date.day;
+  }
+
+  bool _containsEvent(String rowId) {
+    return state.allEvents.any((element) => element.event!.eventId == rowId);
   }
 
   Int64 _eventTimestamp(CalendarDayEvent event, DateTime date) {
@@ -407,12 +481,20 @@ class CalendarEvent with _$CalendarEvent {
 
   const factory CalendarEvent.didReceiveDatabaseUpdate(DatabasePB database) =
       _ReceiveDatabaseUpdate;
+
+  const factory CalendarEvent.duplicateEvent(String viewId, String rowId) =
+      _DuplicateEvent;
+
+  const factory CalendarEvent.deleteEvent(String viewId, String rowId) =
+      _DeleteEvent;
+
+  const factory CalendarEvent.openRowDetail(RowMetaPB row) = _OpenRowDetail;
 }
 
 @freezed
 class CalendarState with _$CalendarState {
   const factory CalendarState({
-    required Option<DatabasePB> database,
+    required DatabasePB? database,
     // events by row id
     required Events allEvents,
     required Events initialEvents,
@@ -420,30 +502,22 @@ class CalendarState with _$CalendarState {
     CalendarEventData<CalendarDayEvent>? newEvent,
     CalendarEventData<CalendarDayEvent>? updateEvent,
     required List<String> deleteEventIds,
-    required Option<CalendarLayoutSettingPB> settings,
+    required CalendarLayoutSettingPB? settings,
+    required RowMetaPB? openRow,
     required LoadingState loadingState,
-    required Option<FlowyError> noneOrError,
+    required FlowyError? noneOrError,
   }) = _CalendarState;
 
-  factory CalendarState.initial() => CalendarState(
-        database: none(),
+  factory CalendarState.initial() => const CalendarState(
+        database: null,
         allEvents: [],
         initialEvents: [],
         deleteEventIds: [],
-        settings: none(),
-        noneOrError: none(),
-        loadingState: const LoadingState.loading(),
+        settings: null,
+        openRow: null,
+        noneOrError: null,
+        loadingState: LoadingState.loading(),
       );
-}
-
-class CalendarEditingRow {
-  CalendarEditingRow({
-    required this.row,
-    required this.index,
-  });
-
-  RowPB row;
-  int? index;
 }
 
 @freezed

@@ -8,30 +8,64 @@ class MobileQuickActionButton extends StatelessWidget {
     required this.onTap,
     required this.icon,
     required this.text,
-    this.color,
+    this.textColor,
+    this.iconColor,
+    this.iconSize,
+    this.enable = true,
+    this.rightIconBuilder,
   });
 
   final VoidCallback onTap;
   final FlowySvgData icon;
   final String text;
-  final Color? color;
+  final Color? textColor;
+  final Color? iconColor;
+  final Size? iconSize;
+  final bool enable;
+  final WidgetBuilder? rightIconBuilder;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        height: 44,
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        child: Row(
-          children: [
-            FlowySvg(icon, size: const Size.square(20), color: color),
-            const HSpace(8),
-            FlowyText(text, fontSize: 15, color: color),
-          ],
+    final iconSize = this.iconSize ?? const Size.square(18);
+    return Opacity(
+      opacity: enable ? 1.0 : 0.5,
+      child: InkWell(
+        onTap: enable ? onTap : null,
+        overlayColor:
+            enable ? null : const WidgetStatePropertyAll(Colors.transparent),
+        splashColor: Colors.transparent,
+        child: Container(
+          height: 52,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            children: [
+              FlowySvg(
+                icon,
+                size: iconSize,
+                color: iconColor,
+              ),
+              HSpace(30 - iconSize.width),
+              Expanded(
+                child: FlowyText.regular(
+                  text,
+                  fontSize: 16,
+                  color: textColor,
+                ),
+              ),
+              if (rightIconBuilder != null) rightIconBuilder!(context),
+            ],
+          ),
         ),
       ),
     );
+  }
+}
+
+class MobileQuickActionDivider extends StatelessWidget {
+  const MobileQuickActionDivider({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const Divider(height: 0.5, thickness: 0.5);
   }
 }

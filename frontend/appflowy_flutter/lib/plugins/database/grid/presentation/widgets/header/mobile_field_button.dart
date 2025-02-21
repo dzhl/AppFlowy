@@ -1,8 +1,7 @@
-import 'package:appflowy/generated/flowy_svgs.g.dart';
 import 'package:appflowy/mobile/presentation/database/field/mobile_field_bottom_sheets.dart';
 import 'package:appflowy/plugins/database/application/field/field_controller.dart';
 import 'package:appflowy/plugins/database/application/field/field_info.dart';
-import 'package:appflowy/util/field_type_extension.dart';
+import 'package:appflowy/plugins/database/grid/presentation/widgets/header/desktop_field_cell.dart';
 import 'package:flowy_infra_ui/flowy_infra_ui.dart';
 import 'package:flutter/material.dart';
 
@@ -38,13 +37,14 @@ class MobileFieldButton extends StatelessWidget {
       width: 200,
       decoration: _getDecoration(context),
       child: FlowyButton(
-        onTap: () => showQuickEditField(context, viewId, fieldInfo),
+        onTap: () =>
+            showQuickEditField(context, viewId, fieldController, fieldInfo),
         radius: radius,
         margin: margin,
         leftIconSize: const Size.square(18),
-        leftIcon: FlowySvg(
-          fieldInfo.fieldType.svgData,
-          size: const Size.square(18),
+        leftIcon: FieldIcon(
+          fieldInfo: fieldInfo,
+          dimension: 18,
         ),
         text: FlowyText(
           fieldInfo.name,

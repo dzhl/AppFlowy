@@ -1,15 +1,10 @@
 import 'dart:convert';
 
+import 'package:appflowy/plugins/database/domain/cell_service.dart';
 import 'package:appflowy_backend/log.dart';
 import 'package:appflowy_backend/protobuf/flowy-database2/protobuf.dart';
 
 import 'cell_controller.dart';
-import 'cell_service.dart';
-
-abstract class IGridCellDataConfig {
-  // The cell data will reload if it receives the field's change notification.
-  bool get reloadOnFieldChanged;
-}
 
 abstract class CellDataParser<T> {
   T? parserData(List<int> data);
@@ -37,12 +32,7 @@ class CellDataLoader<T> {
       (result) => result.fold(
         (CellPB cell) {
           try {
-            // Return null if the data of the cell is empty.
-            if (cell.data.isEmpty) {
-              return null;
-            } else {
-              return parser.parserData(cell.data);
-            }
+            return parser.parserData(cell.data);
           } catch (e, s) {
             Log.error('$parser parser cellData failed, $e');
             Log.error('Stack trace \n $s');
@@ -61,15 +51,41 @@ class CellDataLoader<T> {
 class StringCellDataParser implements CellDataParser<String> {
   @override
   String? parserData(List<int> data) {
-    final s = utf8.decode(data);
-    return s;
+    try {
+      final s = utf8.decode(data);
+      return s;
+    } catch (e) {
+      Log.error("Failed to parse string data: $e");
+      return null;
+    }
+  }
+}
+
+class CheckboxCellDataParser implements CellDataParser<CheckboxCellDataPB> {
+  @override
+  CheckboxCellDataPB? parserData(List<int> data) {
+    if (data.isEmpty) {
+      return null;
+    }
+
+    try {
+      return CheckboxCellDataPB.fromBuffer(data);
+    } catch (e) {
+      Log.error("Failed to parse checkbox data: $e");
+      return null;
+    }
   }
 }
 
 class NumberCellDataParser implements CellDataParser<String> {
   @override
   String? parserData(List<int> data) {
-    return utf8.decode(data);
+    try {
+      return utf8.decode(data);
+    } catch (e) {
+      Log.error("Failed to parse number data: $e");
+      return null;
+    }
   }
 }
 
@@ -79,7 +95,12 @@ class DateCellDataParser implements CellDataParser<DateCellDataPB> {
     if (data.isEmpty) {
       return null;
     }
-    return DateCellDataPB.fromBuffer(data);
+    try {
+      return DateCellDataPB.fromBuffer(data);
+    } catch (e) {
+      Log.error("Failed to parse date data: $e");
+      return null;
+    }
   }
 }
 
@@ -89,7 +110,12 @@ class TimestampCellDataParser implements CellDataParser<TimestampCellDataPB> {
     if (data.isEmpty) {
       return null;
     }
-    return TimestampCellDataPB.fromBuffer(data);
+    try {
+      return TimestampCellDataPB.fromBuffer(data);
+    } catch (e) {
+      Log.error("Failed to parse timestamp data: $e");
+      return null;
+    }
   }
 }
 
@@ -100,7 +126,12 @@ class SelectOptionCellDataParser
     if (data.isEmpty) {
       return null;
     }
-    return SelectOptionCellDataPB.fromBuffer(data);
+    try {
+      return SelectOptionCellDataPB.fromBuffer(data);
+    } catch (e) {
+      Log.error("Failed to parse select option data: $e");
+      return null;
+    }
   }
 }
 
@@ -110,7 +141,13 @@ class ChecklistCellDataParser implements CellDataParser<ChecklistCellDataPB> {
     if (data.isEmpty) {
       return null;
     }
-    return ChecklistCellDataPB.fromBuffer(data);
+
+    try {
+      return ChecklistCellDataPB.fromBuffer(data);
+    } catch (e) {
+      Log.error("Failed to parse checklist data: $e");
+      return null;
+    }
   }
 }
 
@@ -120,6 +157,58 @@ class URLCellDataParser implements CellDataParser<URLCellDataPB> {
     if (data.isEmpty) {
       return null;
     }
-    return URLCellDataPB.fromBuffer(data);
+    try {
+      return URLCellDataPB.fromBuffer(data);
+    } catch (e) {
+      Log.error("Failed to parse url data: $e");
+      return null;
+    }
+  }
+}
+
+class RelationCellDataParser implements CellDataParser<RelationCellDataPB> {
+  @override
+  RelationCellDataPB? parserData(List<int> data) {
+    if (data.isEmpty) {
+      return null;
+    }
+
+    try {
+      return RelationCellDataPB.fromBuffer(data);
+    } catch (e) {
+      Log.error("Failed to parse relation data: $e");
+      return null;
+    }
+  }
+}
+
+class TimeCellDataParser implements CellDataParser<TimeCellDataPB> {
+  @override
+  TimeCellDataPB? parserData(List<int> data) {
+    if (data.isEmpty) {
+      return null;
+    }
+    try {
+      return TimeCellDataPB.fromBuffer(data);
+    } catch (e) {
+      Log.error("Failed to parse timer data: $e");
+      return null;
+    }
+  }
+}
+
+class MediaCellDataParser implements CellDataParser<MediaCellDataPB> {
+  @override
+  MediaCellDataPB? parserData(List<int> data) {
+    if (data.isEmpty) {
+      return null;
+    }
+
+    try {
+      return MediaCellDataPB.fromBuffer(data);
+    } catch (e) {
+      Log.error("Failed to parse media cell data: $e");
+      return null;
+    }
   }
 }

@@ -1,10 +1,11 @@
 import 'dart:io';
 
+import 'package:flutter/material.dart';
+
 import 'package:flowy_infra/size.dart';
 import 'package:flowy_infra_ui/style_widget/hover.dart';
 import 'package:flowy_infra_ui/widget/flowy_tooltip.dart';
 import 'package:flowy_svg/flowy_svg.dart';
-import 'package:flutter/material.dart';
 
 class FlowyIconButton extends StatelessWidget {
   final double width;
@@ -23,7 +24,7 @@ class FlowyIconButton extends StatelessWidget {
   final bool? isSelected;
 
   const FlowyIconButton({
-    Key? key,
+    super.key,
     this.width = 30,
     this.height,
     this.onPressed,
@@ -38,10 +39,9 @@ class FlowyIconButton extends StatelessWidget {
     this.preferBelow = true,
     this.isSelected,
     required this.icon,
-  })  : assert((richTooltipText != null && tooltipText == null) ||
+  }) : assert((richTooltipText != null && tooltipText == null) ||
             (richTooltipText == null && tooltipText != null) ||
-            (richTooltipText == null && tooltipText == null)),
-        super(key: key);
+            (richTooltipText == null && tooltipText == null));
 
   @override
   Widget build(BuildContext context) {
@@ -63,11 +63,12 @@ class FlowyIconButton extends StatelessWidget {
       child = FlowyHover(
         isSelected: isSelected != null ? () => isSelected! : null,
         style: HoverStyle(
-          hoverColor: hoverColor,
-          foregroundColorOnHover:
-              iconColorOnHover ?? Theme.of(context).iconTheme.color,
-          //Do not set background here. Use [fillColor] instead.
-        ),
+            hoverColor: hoverColor,
+            foregroundColorOnHover:
+                iconColorOnHover ?? Theme.of(context).iconTheme.color,
+            borderRadius: radius ?? Corners.s6Border
+            //Do not set background here. Use [fillColor] instead.
+            ),
         resetHoverOnRebuild: false,
         child: child,
       );
@@ -83,9 +84,8 @@ class FlowyIconButton extends StatelessWidget {
         preferBelow: preferBelow,
         message: tooltipMessage,
         richMessage: richTooltipText,
-        showDuration: Duration.zero,
         child: RawMaterialButton(
-          visualDensity: VisualDensity.compact,
+          clipBehavior: Clip.antiAlias,
           hoverElevation: 0,
           highlightElevation: 0,
           shape:

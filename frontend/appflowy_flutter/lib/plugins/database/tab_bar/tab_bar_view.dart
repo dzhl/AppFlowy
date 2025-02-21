@@ -1,18 +1,24 @@
-import 'package:flutter/material.dart';
-
 import 'package:appflowy/plugins/database/application/database_controller.dart';
 import 'package:appflowy/plugins/database/application/tab_bar_bloc.dart';
 import 'package:appflowy/plugins/database/grid/presentation/layout/sizes.dart';
-import 'package:appflowy/plugins/database/widgets/share_button.dart';
+import 'package:appflowy/plugins/shared/share/share_button.dart';
 import 'package:appflowy/plugins/util.dart';
 import 'package:appflowy/startup/plugin/plugin.dart';
+import 'package:appflowy/workspace/application/view/view_bloc.dart';
+import 'package:appflowy/workspace/application/view/view_ext.dart';
+import 'package:appflowy/workspace/application/view_info/view_info_bloc.dart';
 import 'package:appflowy/workspace/presentation/home/home_stack.dart';
+import 'package:appflowy/workspace/presentation/widgets/favorite_button.dart';
+import 'package:appflowy/workspace/presentation/widgets/more_view_actions/more_view_actions.dart';
 import 'package:appflowy/workspace/presentation/widgets/tab_bar_item.dart';
 import 'package:appflowy/workspace/presentation/widgets/view_title_bar.dart';
 import 'package:appflowy_backend/protobuf/flowy-folder/view.pb.dart';
-import 'package:appflowy_editor/appflowy_editor.dart';
+import 'package:flowy_infra_ui/flowy_infra_ui.dart';
 import 'package:flowy_infra_ui/widget/spacing.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:provider/provider.dart';
+import 'package:universal_platform/universal_platform.dart';
 
 import 'desktop/tab_bar_header.dart';
 import 'mobile/mobile_tab_bar_header.dart';
@@ -41,9 +47,15 @@ abstract class DatabaseTabBarItemBuilder {
     BuildContext context,
     DatabaseController controller,
   );
+
+  /// Should be called in case a builder has resources it
+  /// needs to dispose of.
+  ///
+  // If we add any logic in this method, add @mustCallSuper !
+  void dispose() {}
 }
 
-class DatabaseTabBarView extends StatefulWidget {
+class DatabaseTabBarView extends StatelessWidget {
   const DatabaseTabBarView({
     super.key,
     required this.view,
@@ -59,111 +71,112 @@ class DatabaseTabBarView extends StatefulWidget {
   final String? initialRowId;
 
   @override
-  State<DatabaseTabBarView> createState() => _DatabaseTabBarViewState();
-}
-
-class _DatabaseTabBarViewState extends State<DatabaseTabBarView> {
-  final PageController _pageController = PageController();
-  late String? _initialRowId = widget.initialRowId;
-
-  @override
-  void dispose() {
-    _pageController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return BlocProvider<DatabaseTabBarBloc>(
-      create: (context) => DatabaseTabBarBloc(view: widget.view)
-        ..add(const DatabaseTabBarEvent.initial()),
-      child: MultiBlocListener(
-        listeners: [
-          BlocListener<DatabaseTabBarBloc, DatabaseTabBarState>(
-            listenWhen: (p, c) => p.selectedIndex != c.selectedIndex,
-            listener: (context, state) {
-              _initialRowId = null;
-              _pageController.jumpToPage(state.selectedIndex);
-            },
-          ),
-        ],
-        child: Column(
-          children: [
-            if (PlatformExtension.isMobile) const VSpace(12),
-            BlocBuilder<DatabaseTabBarBloc, DatabaseTabBarState>(
-              builder: (context, state) {
-                return ValueListenableBuilder<bool>(
-                  valueListenable: state
-                      .tabBarControllerByViewId[state.parentView.id]!
-                      .controller
-                      .isLoading,
-                  builder: (_, value, ___) {
-                    if (value) {
-                      return const SizedBox.shrink();
-                    }
-
-                    if (PlatformExtension.isDesktop) {
-                      return Padding(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: GridSize.leadingHeaderPadding,
-                        ),
-                        child: const TabBarHeader(),
-                      );
-                    } else {
-                      return const Padding(
-                        padding: EdgeInsets.only(right: 8),
-                        child: MobileTabBarHeader(),
-                      );
-                    }
-                  },
-                );
-              },
-            ),
-            BlocBuilder<DatabaseTabBarBloc, DatabaseTabBarState>(
-              builder: (context, state) =>
-                  pageSettingBarExtensionFromState(state),
-            ),
-            Expanded(
-              child: BlocBuilder<DatabaseTabBarBloc, DatabaseTabBarState>(
-                builder: (context, state) => PageView(
-                  pageSnapping: false,
-                  physics: const NeverScrollableScrollPhysics(),
-                  controller: _pageController,
-                  children: pageContentFromState(state),
-                ),
-              ),
-            ),
-          ],
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider<DatabaseTabBarBloc>(
+          create: (_) => DatabaseTabBarBloc(view: view)
+            ..add(const DatabaseTabBarEvent.initial()),
         ),
+        BlocProvider<ViewBloc>(
+          create: (_) => ViewBloc(view: view)
+            ..add(
+              const ViewEvent.initial(),
+            ),
+        ),
+      ],
+      child: BlocBuilder<DatabaseTabBarBloc, DatabaseTabBarState>(
+        builder: (innerContext, state) {
+          final layout = state.tabBars[state.selectedIndex].layout;
+
+          final Widget child = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (UniversalPlatform.isMobile) const VSpace(12),
+              ValueListenableBuilder<bool>(
+                valueListenable: state
+                    .tabBarControllerByViewId[state.parentView.id]!
+                    .controller
+                    .isLoading,
+                builder: (_, value, ___) {
+                  if (value) {
+                    return const SizedBox.shrink();
+                  }
+
+                  Widget child = UniversalPlatform.isDesktop
+                      ? const TabBarHeader()
+                      : const MobileTabBarHeader();
+
+                  if (innerContext.watch<ViewBloc>().state.view.isLocked) {
+                    child = IgnorePointer(
+                      child: child,
+                    );
+                  }
+
+                  return child;
+                },
+              ),
+              pageSettingBarExtensionFromState(context, state),
+              wrapContent(
+                layout: layout,
+                child: pageContentFromState(context, state),
+              ),
+            ],
+          );
+
+          return child;
+        },
       ),
     );
   }
 
-  List<Widget> pageContentFromState(DatabaseTabBarState state) {
-    return state.tabBars.map((tabBar) {
-      final controller =
-          state.tabBarControllerByViewId[tabBar.viewId]!.controller;
+  Widget wrapContent({required ViewLayoutPB layout, required Widget child}) {
+    if (shrinkWrap) {
+      if (layout.shrinkWrappable) {
+        return child;
+      }
 
-      return tabBar.builder.content(
-        context,
-        tabBar.view,
-        controller,
-        widget.shrinkWrap,
-        _initialRowId,
+      return SizedBox(
+        height: layout.pluginHeight,
+        child: child,
       );
-    }).toList();
+    }
+
+    return Expanded(child: child);
   }
 
-  Widget pageSettingBarExtensionFromState(DatabaseTabBarState state) {
+  Widget pageContentFromState(BuildContext context, DatabaseTabBarState state) {
+    final tab = state.tabBars[state.selectedIndex];
+    final controller = state.tabBarControllerByViewId[tab.viewId]!.controller;
+
+    return tab.builder.content(
+      context,
+      tab.view,
+      controller,
+      shrinkWrap,
+      initialRowId,
+    );
+  }
+
+  Widget pageSettingBarExtensionFromState(
+    BuildContext context,
+    DatabaseTabBarState state,
+  ) {
     if (state.tabBars.length < state.selectedIndex) {
       return const SizedBox.shrink();
     }
     final tabBar = state.tabBars[state.selectedIndex];
     final controller =
         state.tabBarControllerByViewId[tabBar.viewId]!.controller;
-    return tabBar.builder.settingBarExtension(
-      context,
-      controller,
+    return Padding(
+      padding: EdgeInsets.symmetric(
+        horizontal:
+            context.read<DatabasePluginWidgetBuilderSize>().horizontalPadding,
+      ),
+      child: tabBar.builder.settingBarExtension(
+        context,
+        controller,
+      ),
     );
   }
 }
@@ -178,7 +191,9 @@ class DatabaseTabBarViewPlugin extends Plugin {
 
   @override
   final ViewPluginNotifier notifier;
+
   final PluginType _pluginType;
+  late final ViewInfoBloc _viewInfoBloc;
 
   /// Used to open a Row on plugin load
   ///
@@ -186,6 +201,7 @@ class DatabaseTabBarViewPlugin extends Plugin {
 
   @override
   PluginWidgetBuilder get widgetBuilder => DatabasePluginWidgetBuilder(
+        bloc: _viewInfoBloc,
         notifier: notifier,
         initialRowId: initialRowId,
       );
@@ -195,11 +211,36 @@ class DatabaseTabBarViewPlugin extends Plugin {
 
   @override
   PluginType get pluginType => _pluginType;
+
+  @override
+  void init() {
+    _viewInfoBloc = ViewInfoBloc(view: notifier.view)
+      ..add(const ViewInfoEvent.started());
+  }
+
+  @override
+  void dispose() {
+    _viewInfoBloc.close();
+    notifier.dispose();
+  }
+}
+
+const kDatabasePluginWidgetBuilderHorizontalPadding = 'horizontal_padding';
+
+class DatabasePluginWidgetBuilderSize {
+  const DatabasePluginWidgetBuilderSize({required this.horizontalPadding});
+
+  final double horizontalPadding;
 }
 
 class DatabasePluginWidgetBuilder extends PluginWidgetBuilder {
-  DatabasePluginWidgetBuilder({required this.notifier, this.initialRowId});
+  DatabasePluginWidgetBuilder({
+    required this.bloc,
+    required this.notifier,
+    this.initialRowId,
+  });
 
+  final ViewInfoBloc bloc;
   final ViewPluginNotifier notifier;
 
   /// Used to open a Row on plugin load
@@ -207,25 +248,43 @@ class DatabasePluginWidgetBuilder extends PluginWidgetBuilder {
   final String? initialRowId;
 
   @override
-  Widget get leftBarItem => ViewTitleBar(view: notifier.view);
+  String? get viewName => notifier.view.nameOrDefault;
 
   @override
-  Widget tabBarItem(String pluginId) => ViewTabBarItem(view: notifier.view);
+  Widget get leftBarItem =>
+      ViewTitleBar(key: ValueKey(notifier.view.id), view: notifier.view);
 
   @override
-  Widget buildWidget({PluginContext? context, required bool shrinkWrap}) {
+  Widget tabBarItem(String pluginId, [bool shortForm = false]) =>
+      ViewTabBarItem(view: notifier.view, shortForm: shortForm);
+
+  @override
+  Widget buildWidget({
+    required PluginContext context,
+    required bool shrinkWrap,
+    Map<String, dynamic>? data,
+  }) {
     notifier.isDeleted.addListener(() {
-      notifier.isDeleted.value.fold(() => null, (deletedView) {
-        if (deletedView.hasIndex()) {
-          context?.onDeleted(notifier.view, deletedView.index);
-        }
-      });
+      final deletedView = notifier.isDeleted.value;
+      if (deletedView != null && deletedView.hasIndex()) {
+        context.onDeleted?.call(notifier.view, deletedView.index);
+      }
     });
-    return DatabaseTabBarView(
-      key: ValueKey(notifier.view.id),
-      view: notifier.view,
-      shrinkWrap: shrinkWrap,
-      initialRowId: initialRowId,
+
+    final horizontalPadding =
+        data?[kDatabasePluginWidgetBuilderHorizontalPadding] as double? ??
+            GridSize.horizontalHeaderPadding + 40;
+
+    return Provider(
+      create: (context) => DatabasePluginWidgetBuilderSize(
+        horizontalPadding: horizontalPadding,
+      ),
+      child: DatabaseTabBarView(
+        key: ValueKey(notifier.view.id),
+        view: notifier.view,
+        shrinkWrap: shrinkWrap,
+        initialRowId: initialRowId,
+      ),
     );
   }
 
@@ -234,9 +293,21 @@ class DatabasePluginWidgetBuilder extends PluginWidgetBuilder {
 
   @override
   Widget? get rightBarItem {
-    return DatabaseShareButton(
-      key: ValueKey(notifier.view.id),
-      view: notifier.view,
+    final view = notifier.view;
+    return BlocProvider<ViewInfoBloc>.value(
+      value: bloc,
+      child: Row(
+        children: [
+          ShareButton(key: ValueKey(view.id), view: view),
+          const HSpace(10),
+          ViewFavoriteButton(view: view),
+          const HSpace(4),
+          MoreViewActions(view: view),
+        ],
+      ),
     );
   }
+
+  @override
+  EdgeInsets get contentPadding => const EdgeInsets.only(top: 28);
 }

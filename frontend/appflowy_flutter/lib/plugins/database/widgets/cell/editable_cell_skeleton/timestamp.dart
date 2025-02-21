@@ -57,7 +57,7 @@ class _TimestampCellState extends GridCellState<EditableTimestampCell> {
       widget.databaseController,
       widget.cellContext,
     ).as(),
-  )..add(const TimestampCellEvent.initial());
+  );
 
   @override
   void dispose() {
@@ -83,7 +83,7 @@ class _TimestampCellState extends GridCellState<EditableTimestampCell> {
   }
 
   @override
-  void requestBeginFocus() {
+  void onRequestFocus() {
     widget.cellContainerNotifier.isFocus = true;
   }
 

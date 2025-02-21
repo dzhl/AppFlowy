@@ -7,7 +7,7 @@ import 'package:appflowy_backend/protobuf/flowy-database2/field_settings_entitie
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
-import '../../application/field/field_service.dart';
+import '../../domain/field_service.dart';
 
 part 'grid_header_bloc.freezed.dart';
 
@@ -19,6 +19,12 @@ class GridHeaderBloc extends Bloc<GridHeaderEvent, GridHeaderState> {
 
   final String viewId;
   final FieldController fieldController;
+
+  @override
+  Future<void> close() async {
+    fieldController.removeListener(onFieldsListener: _onReceiveFields);
+    await super.close();
+  }
 
   void _dispatch() {
     on<GridHeaderEvent>(
@@ -82,11 +88,13 @@ class GridHeaderBloc extends Bloc<GridHeaderEvent, GridHeaderState> {
 
   void _startListening() {
     fieldController.addListener(
-      onReceiveFields: (fields) =>
-          add(GridHeaderEvent.didReceiveFieldUpdate(fields)),
+      onReceiveFields: _onReceiveFields,
       listenWhen: () => !isClosed,
     );
   }
+
+  void _onReceiveFields(List<FieldInfo> fields) =>
+      add(GridHeaderEvent.didReceiveFieldUpdate(fields));
 }
 
 @freezed
